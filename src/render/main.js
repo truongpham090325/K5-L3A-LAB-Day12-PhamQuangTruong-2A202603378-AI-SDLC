@@ -94,6 +94,7 @@ let nightsWon = 0;
 let reducedMotion = false;
 let bigFont = false;
 let subtitles = false;
+let keyBindings = { move_fwd: 'w', move_back: 's', move_left: 'a', move_right: 'd', jump: ' ', dash: 'Shift', interact: 'e', pulse: 'q', pause: 'Escape' };
 let bench = null;
 let benchStartT = 0;
 const keys = {};
@@ -348,13 +349,13 @@ function startGame(night) {
 
 // ---------- input ----------
 window.addEventListener('keydown', (e) => {
-  const k = e.key.toLowerCase();
+  const k = e.key;
   keys[k] = true;
-  if (e.key === ' ' || e.key === 'Tab') e.preventDefault();
-  if ((e.key === 'Escape' || k === 'p') && phase === 'playing') togglePause();
+  if (k === ' ' || k === 'Tab') e.preventDefault();
+  if (k === keyBindings.pause && phase === 'playing') togglePause();
 });
 window.addEventListener('keyup', (e) => {
-  keys[e.key.toLowerCase()] = false;
+  keys[e.key] = false;
 });
 
 function lockPointer() {
@@ -411,7 +412,7 @@ $('btn-settings-done').onclick = () => {
   settings = {
     music: +$('set-music').value, sfx: +$('set-sfx').value, sensitivity: +$('set-sens').value,
     colorBlind: !!$('set-cb').checked, reducedMotion: !!$('set-motion').checked,
-    bigFont: !!$('set-bigfont').checked, subtitles: !!$('set-subtitles').checked,
+    bigFont: !!$('set-bigfont').checked, subtitles: !!$('set-subtitles').checked, keys: { ...keyBindings },
   };
   audio.saveSettings(settings);
   audio.setMusicVolume(settings.music);
@@ -428,15 +429,56 @@ $('set-motion').checked = !!settings.reducedMotion;
 $('set-bigfont').checked = !!settings.bigFont;
 $('set-subtitles').checked = !!settings.subtitles;
 
+// Đổi phím: bấm vào hành động -> gõ phím mới
+const KB_ACTIONS = [
+  ['move_fwd', 'Di chuyển tiến'], ['move_back', 'Di chuyển lùi'],
+  ['move_left', 'Di chuyển trái'], ['move_right', 'Di chuyển phải'],
+  ['jump', 'Nhảy'], ['dash', 'Lướt'], ['interact', 'Nạp đèn/Châm dầu'], ['pulse', 'Tỏa sáng'], ['pause', 'Tạm dừng'],
+];
+function keyLabel(k) {
+  if (k == null) return '(ngắt)';
+  if (k === ' ') return 'Space';
+  if (k === 'Shift') return 'Shift';
+  if (k === 'Escape') return 'Esc';
+  if (k === 'ArrowUp') return '↑';
+  if (k === 'ArrowDown') return '↓';
+  if (k === 'ArrowLeft') return '←';
+  if (k === 'ArrowRight') return '→';
+  return k;
+}
+function rebind(action) {
+  const label = KB_ACTIONS.find((a) => a[0] === action)[1];
+  const name = (window.prompt('Nhấn phím mới cho "' + label + '" (bấm Đồng ý để bôi đường trang):', keyLabel(keyBindings[action])) || '').trim();
+  const allowed = /^[A-Za-z0-9_]$|^(Shift|Escape|Space|Enter|ArrowUp|ArrowDown|ArrowLeft|ArrowRight)$/;
+  if (!allowed.test(name)) { window.alert('Phím không hợp lệ: ' + name); return; }
+  keyBindings[action] = name;
+  settings.keys = { ...keyBindings };
+  audio.saveSettings(settings);
+  renderKB();
+}
+function renderKB() {
+  const sec = $('kb-section');
+  sec.innerHTML = '';
+  for (const [action, label] of KB_ACTIONS) {
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = label + ': ' + keyLabel(keyBindings[action]);
+    btn.onclick = () => rebind(action);
+    sec.appendChild(btn);
+  }
+}
+
 function applyAccessibility() {
   reducedMotion = settings.reducedMotion;
   bigFont = settings.bigFont;
   subtitles = settings.subtitles;
+  if (settings.keys) Object.assign(keyBindings, settings.keys);
   const appEl = document.getElementById('app');
   appEl.style.transform = bigFont ? 'scale(1.25)' : '';
   moon.position.y = 40; // chốt tại rạnh mây (không rung) khi reducedMotion
   $('subtitles').hidden = !subtitles || phase !== 'playing';
   updateSubtitles();
+  renderKB();
 }
 
 function updateSubtitles() {
@@ -645,10 +687,24 @@ const STEP = 1 / 60;
 let acc = 0;
 let lastT = performance.now();
 
+function isPressed(k) {
+  if (!k) return false;
+  if (k === 'ArrowUp') return !!keys['ArrowUp'] || !!keys['arrowup'];
+  if (k === 'ArrowDown') return !!keys['ArrowDown'] || !!keys['arrowdown'];
+  if (k === 'ArrowLeft') return !!keys['ArrowLeft'] || !!keys['arrowleft'];
+  if (k === 'ArrowRight') return !!keys['ArrowRight'] || !!keys['arrowright'];
+  return !!keys[k];
+}
+
+function actionForKey(key) {
+  for (const [a, k] of Object.entries(keyBindings)) if (k === key) return a;
+  return null;
+}
+
 function buildFrame() {
-  const mx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
-  const mz = (keys['w'] || keys['arrowup'] ? 1 : 0) - (keys['s'] || keys['arrowdown'] ? 1 : 0);
-  return { move: [mx, mz], cam_yaw_deg: yawDeg, jump: !!keys[' '], interact: !!keys['e'], pulse: !!keys['q'], dash: !!keys['shift'] };
+  const mx = (isPressed(keyBindings.move_right) ? 1 : 0) - (isPressed(keyBindings.move_left) ? 1 : 0);
+  const mz = (isPressed(keyBindings.move_fwd) ? 1 : 0) - (isPressed(keyBindings.move_back) ? 1 : 0);
+  return { move: [mx, mz], cam_yaw_deg: yawDeg, jump: isPressed(keyBindings.jump), interact: isPressed(keyBindings.interact), pulse: isPressed(keyBindings.pulse), dash: isPressed(keyBindings.dash) };
 }
 
 function handleEvents(events) {
