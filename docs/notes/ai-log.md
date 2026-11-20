@@ -34,3 +34,39 @@
 
 1. **Test "rơi khỏi đảo" viết sai** (mong đợi nhân vật đứng yên ở giữa đảo sau khi rơi, trong khi nhân vật vẫn giữ phím đi). → Tôi nhận ra assertion sai ngữ nghĩa, sửa test cho đúng hành vi thật (dừng di chuyển sau khi rơi). *Bài học: kiểm chứng phải mô tả đúng hành vi, không phải hành vi mình "muốn".*
 2. **Server chạy nền bị chết** khi dùng `Start-Job` (chỉ sống trong session PowerShell). → Chuyển sang chạy background thật của harness. *Bài học: công cụ nền phải chọn đúng loại.*
+
+---
+
+# Nhật ký dùng AI — Phase 2 (Ticket-02)
+
+## Tóm tắt công việc
+
+1. Đọc Ticket-02 kỹ, tách **số liệu chuẩn bắt buộc** (Phần 1) khỏi chỗ mơ hồ → ghi giả định v1.1.
+2. Viết lại engine (`sim.js`) theo contract v1.1: vật lý Y (nhảy/trọng lực/rơi), lướt, pause, 3 Đêm với địa hình khác nhau, Bóng Mực 5 trạng thái + lịch sinh, Gió Lạc, Bùa Gió, gió, bục nhảy, tầng/dốc/tháp.
+3. Cập nhật `headless.js` (`--night 1|2|3`), `game.contract.json` (v1.1 + tuning chuẩn).
+4. Viết lại bộ test (24 test) gồm regression Phase 1 + mỗi tính năng mới + hiệu năng.
+5. Viết lại game 3D cho 3 Đêm: menu → giới thiệu Đêm → chơi → kết quả → Đêm kế, HUD đầy đủ, tạm dừng, cài đặt (lưu localStorage), âm thanh thủ tục, bảng màu chuẩn.
+
+## Ước tính token / chi phí
+
+| Việc | Ước lượng token (xấp xỉ) |
+|---|---:|
+| Đọc & phân tích Ticket-02 + ghi giả định | ~8k |
+| Viết lại engine v1.1 (sim/headless/constants) | ~30k |
+| Viết lại test + chạy + sửa lỗi | ~10k |
+| Viết lại game 3D (3 Đêm, HUD, menu, audio) | ~20k |
+| Tài liệu + bằng chứng | ~8k |
+| **Tổng Phase 2** | **~76k token** |
+
+## Cách tôi tiết kiệm token
+
+- **Dùng lại kiến trúc Phase 1** (logic/ hiển thị tách rời) — không phải thiết kế lại.
+- **Test đơn vị trên engine logic** trước khi đụng vào 3D → vòng phản hồi rẻ.
+- **Sinh bằng chứng bằng script**, không chạy tay.
+- **Âm thanh thủ tục** (WebAudio) thay vì tìm/ tải asset.
+
+## Những lần AI sai và cách xử lý
+
+1. **Test bùa Gió sai** (mong đợi `charm_ticks == 600` sau khi đã qua thêm 1 tick; thực tế bộ đếm đã trừ 1). → Nhận ra thứ tự xử lý tick (giảm bộ đếm trước khi nhặt), sửa test chạy đúng 1 tick.
+2. **`requestPointerLock` ném `WrongDocumentError`** trong trình duyệt tự động (Promise bị từ chối không bắt được bằng try/catch thường). → Bắt thêm `.catch()` trên Promise; game không bị treo.
+

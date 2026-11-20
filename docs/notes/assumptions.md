@@ -1,64 +1,59 @@
-# Giả định Phase 1 (Đảo Đèn Lồng — PRD-0 + Test Contract v1.0)
+# Giả định & quyết định — Phase 2 (Ticket-02, Test Contract v1.1)
 
-PRD-0 cố ý để nhiều chỗ mơ hồ. Dưới đây là các **giả định tôi tự chọn** và đã áp dụng. Mỗi giả định ghi rõ lý do. Khi phase sau làm rõ/chuyển một giả định, cập nhật file này.
+Ticket-02 chuẩn hóa gần hết số liệu (bắt buộc). Dưới đây là những chỗ **vẫn còn mơ hồ** tôi đã tự quyết, và những lưu ý triển khai quan trọng. Các số chuẩn (tốc độ, chi phí, bán kính, thời gian…) nằm trong `src/core/constants.js` và `game.contract.json`, khớp đúng ticket.
 
-## 1. Tài nguyên `flames` (ngọn lửa)
+## 1. Tọa độ & góc
 
-- **Giả định:** `flames` vừa là **máu** vừa là **nguồn sáng** (một tài nguyên chung), bắt đầu bằng `3`.
-- **Hành vi:** bị Bóng Mực chạm → `-1`; tỏa sáng (pulse) → `-pulse_cost` (1); bằng `0` → thua `no_flames`.
-- **Lý do:** Test Contract chỉ có duy nhất trường `player.flames`; không có trường máu/ánh sáng riêng. PRD nói "chạm thì mất máu" và "tỏa sáng tốn ánh sáng" → gộp làm một.
+- Góc đo từ trục **+X**, **ngược chiều kim đồng hồ** khi nhìn từ trên xuống: `pos(θ) = (r·cosθ, 0, r·sinθ)`; θ=0 → +X, θ=90° → +Z. (Xác nhận bằng vị trí L1 (0,0,25) = +Z.)
+- Gió `dir_deg` là **hướng gió thổi tới** (cùng quy ước góc trên).
 
-## 2. Điều kiện thắng / thua
+## 2. Chiều cao thực thể (chọn hợp lý, ghi rõ)
 
-| Kết quả | reason | Khi nào |
-|---|---|---|
-| `won` | `all_lit` | Thắp đủ cả 5 đèn |
-| `lost` | `no_flames` | `flames == 0` (do bị chạm hoặc tỏa sáng đến cạn) |
-| `lost` | `dawn` | Hết giờ đêm (`time_left_s <= 0`) mà chưa thắp hết đèn |
+- **Bóng Mực:** tâm = `mặt đất + 1.0m` (lơ lửng). Chạm: XZ ≤ 1.0m **và** |tâm bóng − chân Mây| ≤ 1.5m.
+- **Gió Lạc:** bay ở `mặt đất + 1.0m`. Chạm: chỉ XZ ≤ 1.2m (không xét độ cao, theo ticket).
+- **Đom đóm:** `pos.y` = mặt đất nơi đặt (điểm đặt), nhặt khi XZ ≤ 1.0m **và** |mặt đất đom đóm − chân Mây| ≤ 1.5m.
+- Tâm Tỏa Sáng = chân Mây + 0.8m; khoảng cách tới Bóng Mực/Gió Lạc tính **3D**.
 
-- **Giả định:** hết giờ đêm = **thua** (`dawn`), vì mục tiêu PRD là "thắp hết đèn thì thắng"; không thắp kịp trước bình minh là thất bại.
-- **Thứ tự ưu tiên khi xung đột:** `all_lit` > `no_flames` > `dawn`.
+## 3. Bóng Mực — trạng thái
 
-## 3. Nhặt đom đóm vs nạp đèn
+- Đúng tên: `spawning` (60 tick = 1s, hóa thân), `wander` (đứng yên chờ phát hiện), `chase`, `recoil` (60 tick, lùi 2m), `stunned` (120 tick, 15 tick đầu bị đẩy lùi 4m).
+- Phát hiện/ bỏ đuổi: vào `chase` khi ≤ 12m, về `wander` khi > 18m.
+- Sinh: 2 con lúc tick 300, sau đó 1 con mỗi chu kỳ (Đêm 1: 8s, Đêm 2: 7s, Đêm 3: 6s), tối đa 6/8/10. Điểm sinh cách người chơi ≥ 15m (áp dụng mọi Đêm, chọn ngẫu nhiên có seed).
+- `wander` được chọn là **đứng yên** (đơn giản, tất định); việc này không ảnh hưởng test (test đặt `state` rõ ràng).
 
-- **Giả định:** đom đóm **tự nhặt khi đi qua** trong `pickup_radius` (1.5m); đèn cần **bấm interact** trong `interact_radius` (2.0m). Hai bán kính riêng trong tuning gợi ý cơ chế này.
-- **Giả định khi nạp:** nạp vào đèn chưa thắp gần nhất, số nạp = `min(carried, lantern_cost - deposited)` (không nạp thừa). Đủ `lantern_cost` thì thắp (`lit = true`, phát `lantern_lit`).
+## 4. Gió Lạc (drifters)
 
-## 4. Rơi đom đóm khi bị chạm
+- Sinh tại tick 1200, 2400 (mỗi 1200 tick), tối đa 2, id D1, D2. Vị trí sinh: ngẫu nhiên (có seed) trong bán kính 10–20m quanh tâm đảo.
+- `idle` lượn 2 m/s theo hướng ngẫu nhiên (seed), quay đầu khi chạm rìa đảo.
+- `chase` khi Mây mang ≥ 5 **và** cách ≤ 15m; mất điều kiện → về `idle`.
+- Cướp `min(3, đang mang)`; sau khi cướp → `flee` 240 tick rồi biến mất cùng số đã cướp. Mỗi con chỉ cướp 1 lần (state machine tự đảm bảo).
+- Tỏa Sáng trúng `chase` → `flee` (không cướp); trúng `flee` có đồ → thả toàn bộ (đom đóm rơi) và biến mất sau 120 tick.
+- **Không có sự kiện `drifter_spawned`** (ticket chỉ thêm 7 sự kiện mới; Gió Lạc xuất hiện thể hiện qua mảng `drifters` trong snapshot).
 
-- **Giả định:** `hit_drop_ratio` = 0.5, số rơi = `floor(carried * 0.5)` khi bị **Bóng Mực** chạm; khi **rơi khỏi đảo** thì rơi **toàn bộ** (`dropped = carried`).
-- Đom đóm rơi **tái xuất hiện** quanh người chơi (bán kính 2m, vị trí tất định theo chỉ số) để nhặt lại được.
+## 5. Bùa Gió (charm) & Gió (Đêm 3)
 
-## 5. Đảo và rơi khỏi đảo
+- Bùa: hiệu lực 600 tick (10s), tái xuất sau 2700 tick (45s). Nhặt lại làm mới về 600. Vị trí: Đêm 2 (35,0,0); Đêm 3 (30,0,25) và (−30,0,25). Id C1, C2 theo thứ tự.
+- Gió: cơn gió hoạt động khi `simTick ≥ 1800` và `simTick % 1800 < 300` (tức [30s, 35s), [60s, 65s), …). Hướng mỗi cơn ngẫu nhiên (seed). Đẩy 2 m/s cộng vào vận tốc ngang mục tiêu.
 
-- **Giả định:** đảo tròn bán kính `ISLAND_RADIUS = 30m` (không nằm trong contract — là hằng số thiết kế riêng).
-- **Giả định:** `fall_enabled = true` → đi quá rìa đảo bị phạt (`player_hit by=fall`, `-1` flames, rơi hết đom đóm, hồi sinh giữa đảo `(0,0,0)`).
+## 6. Rơi khỏi đảo & hồi sinh
 
-## 6. Bóng Mực
+- Rơi khi `Y < −10`. Xảy ra đúng 1 lần: −1 Ngọn Lửa, mất **toàn bộ** đom đóm (sự kiện `player_hit` có thêm `lost`, `dropped = 0`).
+- Chờ 60 tick (không di chuyển/nhặt/bị đánh), rồi hồi sinh ở (0,0,0), vận tốc 0, bất tử 90 tick. Hết Ngọn Lửa → thua ngay, không hồi sinh.
 
-- **Trạng thái:** tối thiểu `stunned` (theo contract); trạng thái còn lại tôi đặt là `chase`.
-- **Giả định:** khi `random_shades = false`, các Bóng Mực liệt kê hoạt động ngay. Khi `true` (mặc định), có 2 con ngay từ đầu + 1 con xuất hiện ở tick 1200 (20s).
-- **Vùng an toàn:** Bóng Mực không vào được bán kính `safe_radius` quanh đèn **đã thắp**; khi đèn vừa thắp, Bóng Mực đang ở trong vùng đó bị đẩy ra ngoài biên.
-- **Tốc độ:** `shade_speed = 3.5 m/s` (chậm hơn người chơi 5 m/s để né được).
+## 7. Điểm & thứ tự thắng/thua
 
-## 7. Tỏa sáng (pulse)
+- +10 mỗi đom đóm **nạp** (không phải nhặt), +100 mỗi đèn, +5 mỗi Bóng Mực trúng Tỏa Sáng (mỗi con mỗi lần, kể cả đang choáng), thắng +2/giây +50/Ngọn Lửa.
+- Thứ tự xét sau mỗi tick: `no_flames` → `all_lit` → `dawn` (đổi so với Phase 1: hết Ngọn Lửa luôn thua trước).
 
-- **Giả định:** pulse choáng tất cả Bóng Mực trong `pulse_radius` (6m), đẩy lùi `pulse_push_m` (4m), choáng `pulse_stun_s` (3s), hồi chiêu `pulse_cooldown_s` (1s).
-- **Giả định:** pulse **được phép tiêu đến ngọn lửa cuối** (nếu `flames` về 0 → thua `no_flames`). Sự kiện `pulse` luôn được ghi khi pulse xảy ra (kể cả `stunned_ids` rỗng).
+## 8. Địa hình
 
-## 8. Nhảy (jump)
+- Đêm 2: cầu tre x∈[26,44], z∈[−2,2]. Bục nhảy phóng về tâm đảo kia.
+- Đêm 3: tầng 0 (r≤45, Y=0), tầng 1 (vành 12–24, z>0, Y=3), tầng 2 (r≤8, Y=6). Dốc ở 30°/150° nối Y 0→3 (độ dốc (30−r)/2). Vách đứng chặn bước lên > 0.5m. Tháp chuông (r≤2) chặn di chuyển ngang khi Y < 14.
 
-- **Giả định:** jump là hành động **chỉ hiển thị** (không ảnh hưởng vị trí XZ, không có event headless). Trong headless nhận input `jump` bình thường nhưng không đổi trạng thái quan sát được.
+## 9. Nạp đèn
 
-## 9. Sinh đom đóm / vị trí mặc định
+- Trong bán kính 2.0m, nạp `min(đang mang, còn thiếu)` vào đèn **chưa sáng** gần nhất; bằng khoảng cách thì chọn id nhỏ hơn.
 
-- **Giả định:** khi `random_motes = true` (mặc định), sinh **30 đom đóm** (cần 25 để thắp 5 đèn, dư 5 để có chỗ rơi). Không sinh lại đom đóm trong Đêm 1.
-- **Vị trí 5 đèn mặc định** (vòng tròn bán kính 20m): L1 (20,0,0), L2 (6.18,0,19.021), L3 (-16.18,0,11.756), L4 (-16.18,0,-11.756), L5 (6.18,0,-19.021).
+## 10. Hiệu năng & tất định
 
-## 10. ID tự sinh
-
-- **Giả định:** đom đóm đặt `M1, M2, ...`, Bóng Mực đặt `S1, S2, ...` theo thứ tự xuất hiện (tất định). Scenario có thể ghi đè id Bóng Mực (`shades[].id`).
-
-## 11. Làm tròn số
-
-- **Giả định:** tọa độ làm tròn **3 chữ số thập phân** ở đầu ra; `time_left_s` cũng làm tròn 3 chữ số. Điểm số luôn là số nguyên.
+- Toàn bộ ngẫu nhiên dùng RNG có seed (mulberry32), không dùng `Math.random()`/`Date.now()` trong `src/core/*`. Đêm đầy đủ 21600 tick chạy < 0.2s (đạt yêu cầu ≤ 30s).

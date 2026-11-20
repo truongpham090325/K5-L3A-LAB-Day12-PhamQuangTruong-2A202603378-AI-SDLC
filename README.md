@@ -1,18 +1,18 @@
-# Đảo Đèn Lồng (Đêm 1 — Đảo Bến)
+# Đảo Đèn Lồng (3 Đêm)
 
 > **Video demo:** *(sẽ thêm ở Phase 4)*
 
-Game 3D góc nhìn thứ ba. Bạn điều khiển **Mây**, người giữ đèn nhỏ tuổi của hòn đảo giữa biển mây. Đêm nay sương đen đã nuốt hết ánh sáng — Mây phải chạy khắp đảo thu thập **đom đóm**, mang về nạp vào các **Đèn Lồng Lớn**, đồng thời né **Bóng Mực** trong bóng tối.
+Game 3D góc nhìn thứ ba. Bạn điều khiển **Mây**, người giữ đèn nhỏ tuổi của hòn đảo giữa biển mây. Sương đen đã nuốt hết ánh sáng — Mây phải chạy khắp ba hòn đảo thu thập **đom đóm**, mang về nạp vào các **Đèn Lồng Lớn**, né **Bóng Mực** và **Gió Lạc**, cho tới khi bình minh.
 
-- **Công nghệ:** JavaScript (ES modules) + **Three.js** (đồ họa 3D, chạy trên trình duyệt) + **Node.js** (chế độ headless). Không phụ thuộc engine thương mại; chạy được trên macOS, Linux và Windows.
-- **Kiến trúc:** logic game tách riêng trong `src/core/sim.js`, dùng chung cho cả chế độ chơi 3D lẫn chế độ headless — nên đầu ra headless luôn khớp đúng hành vi thật.
+- **Công nghệ:** JavaScript (ES modules) + **Three.js** (3D, chạy trình duyệt) + **Node.js** (headless). Chạy được trên macOS, Linux, Windows.
+- **Kiến trúc:** logic game tách riêng trong `src/core/sim.js`, dùng chung cho cả chế độ chơi 3D lẫn chế độ headless.
 
 ---
 
 ## Cài đặt và chạy (tối đa 3 lệnh)
 
 ```bash
-npm install     # 1) cài đặt (repo không có thư viện ngoài; lệnh này chỉ để chuẩn hóa)
+npm install     # 1) cài đặt (không có thư viện ngoài)
 npm start       # 2) chạy game, mở trình duyệt tại http://localhost:8080
 ```
 
@@ -25,93 +25,81 @@ Nếu trình duyệt không tự mở, truy cập **http://localhost:8080**.
 | `W A S D` / phím mũi tên | Di chuyển |
 | Chuột (click để khóa con trỏ) | Xoay camera |
 | `Space` | Nhảy |
+| `Shift` | Lướt (dash) |
 | `E` | Nạp đom đóm vào đèn gần nhất |
-| `Q` | Tỏa sáng (xua Bóng Mực, tốn 1 ngọn lửa) |
-| `Esc` | Thả con trỏ chuột |
+| `Q` | Tỏa sáng (xua Bóng Mực, tốn 3 đom đóm) |
+| `Esc` / `P` | Tạm dừng (Tiếp tục / Chơi lại / Cài đặt / Về menu) |
 
-## Cách tính điểm
+## Ba Đêm
+
+| Đêm | Đảo | Thời gian | Đèn | Điểm riêng |
+|---|---|---:|---:|---|
+| 1 | Đảo Bến (đảo tròn 40m) | 300s | 5 | Bóng Mực |
+| 2 | Đảo Cau (hai đảo nối cầu tre, bục nhảy) | 330s | 6 | Bóng Mực, Gió Lạc, Bùa Gió |
+| 3 | Đảo Chuông (3 tầng, dốc, tháp chuông, gió mạnh) | 360s | 7 | Bóng Mực, Gió Lạc, Bùa Gió |
+
+## Cách tính điểm (chuẩn hóa)
 
 | Sự kiện | Điểm |
 |---|---:|
-| Nhặt 1 đom đóm | +10 |
+| Nạp 1 đom đóm vào đèn | +10 |
 | Thắp 1 Đèn Lồng Lớn | +100 |
-| Làm choáng 1 Bóng Mực | +5 |
-| Thắng: mỗi giây còn lại | +1 |
+| 1 Bóng Mực trúng Tỏa Sáng | +5 |
+| Thắng: mỗi giây còn lại | +2 |
 | Thắng: mỗi ngọn lửa còn lại | +50 |
+
+Tổng điểm = tổng điểm các Đêm **đã thắng**.
 
 ## Luật chơi (tóm tắt)
 
-- Đêm 1 có **5 Đèn Lồng Lớn**; mỗi đèn cần **5 đom đóm** để thắp.
-- **Đom đóm** rải rác trên đảo, nhặt tự động khi đi qua (bán kính 1.5m), mang tối đa **10** con.
-- **Bóng Mực** đuổi theo Mây; chạm vào **mất 1 ngọn lửa** và đánh rơi một nửa số đom đóm đang mang (tạm bất tử 1s).
-- **Tỏa sáng** (Q) làm choáng Bóng Mực 3s và đẩy lùi 4m, tốn 1 ngọn lửa.
-- Ngọn lửa (`flames`) vừa là máu vừa là nguồn sáng, bắt đầu bằng **3**.
-- **Thắng:** thắp đủ 5 đèn. **Thua:** hết ngọn lửa, hoặc hết giờ đêm (180s).
-- Đèn đã thắp tạo vùng an toàn (bán kính 3m) mà Bóng Mực không vào được.
+- Mỗi đèn cần **10 đom đóm** để thắp; nạp nhiều lần được, đèn nhớ tiến độ. Mang tối đa **10**.
+- **Đom đóm** rải rác, nhặt tự động khi đi qua (bán kính 1m); sinh thêm theo thời gian.
+- **Bóng Mực** đuổi theo khi lại gần (12m); chạm mất 1 Ngọn Lửa và rơi nửa số đom đóm đang mang.
+- **Gió Lạc** (Đêm 2–3) cướp đom đóm khi Mây mang ≥ 5; Tỏa Sáng đuổi chúng đi.
+- **Tỏa Sáng** tốn 3 đom đóm, làm choáng Bóng Mực 2s.
+- **Lướt** (dash) phóng nhanh 14 m/s trong 0.2s, hồi chiêu 1.5s.
+- **Bùa Gió** tăng tốc chạy (7.2 m/s) và Lướt không hồi chiêu trong 10s.
+- Ngọn Lửa = máu, bắt đầu 3, hồi đầy mỗi Đêm.
+- **Thắng** khi thắp đủ đèn; **thua** khi hết Ngọn Lửa hoặc hết giờ.
+- Đèn đã sáng tạo vùng an toàn (6m) mà Bóng Mực không vào được.
 
 ---
 
-## Chế độ headless (Test Contract v1.0)
+## Chế độ headless (Test Contract v1.1)
 
-Mọi bài nộp được chấm tự động qua chế độ chạy không giao diện. Khai báo nằm ở **`game.contract.json`**.
+Khai báo ở **`game.contract.json`** (v1.1). Hỗ trợ `--night 1|2|3`.
 
 ```bash
-# ví dụ
-node src/headless.js --seed 42 --night 1 --ticks 120 --out out.jsonl
-# đầy đủ tham số:
-node src/headless.js --seed <int> --night 1 [--scenario file.json] [--inputs file.json] \
+node src/headless.js --seed <int> --night <1|2|3> [--scenario file.json] [--inputs file.json] \
                      --ticks <int> --out file.jsonl [--snapshot-every <int, mặc định 10>]
 ```
 
-- Logic chạy **60 tick/giây** cố định, không cần cửa sổ/GPU.
-- Output là **JSONL** gồm 3 loại dòng: `snapshot`, `event`, `end` (dòng cuối bắt buộc).
-- **Tính tất định:** cùng `--seed`, scenario và inputs luôn cho output giống hệt nhau.
-- Lỗi định dạng scenario/inputs → mã thoát `2`; lỗi khác → mã thoát khác `0`.
+- Logic chạy **60 tick/giây** cố định, không cần cửa sổ/GPU. Đêm đầy đủ (21600 tick) chạy **< 0.2s**.
+- Output **JSONL**: dòng `night_start`, `snapshot`, `event`, `end` (bắt buộc cuối).
+- **Tính tất định:** cùng `--seed`, scenario, inputs luôn cho output giống hệt nhau.
+- Lỗi định dạng scenario/inputs → mã thoát `2`.
 
-Chi tiết đầy đủ về Test Contract (cấu trúc `scenario`, `inputs`, `output`) nằm trong PRD-0. Các **giả định** tôi đã chọn ghi ở [`docs/notes/assumptions.md`](docs/notes/assumptions.md).
+Chi tiết giả định: [`docs/notes/assumptions.md`](docs/notes/assumptions.md).
 
 ---
 
 ## Kiểm chứng
 
-- **Chạy bộ test:** `npm test` (17 test đơn vị + tích hợp, gồm kiểm tra tính tất định và mã thoát lỗi).
-- **Bằng chứng Phase 1:** [`docs/proof/phase-1/README.md`](docs/proof/phase-1/README.md) — bảng truy vết từng yêu cầu đến file `.jsonl` thật.
+- **Chạy test:** `npm test` (24 test đơn vị + tích hợp: di chuyển, nhảy, lướt, nhặt, nạp, tỏa sáng, Bóng Mực, Gió Lạc, Bùa Gió, gió, bục nhảy, rơi, thắng/thua, pause, tính tất định, hiệu năng).
+- **Bằng chứng:** [`docs/proof/phase-2/README.md`](docs/proof/phase-2/README.md).
 
 ---
 
 ## Sáng tạo của tôi
 
-Ngoài phần lõi bắt buộc, tôi thêm các chi tiết **chỉ ở lớp hiển thị** (không làm đổi đầu ra headless):
+Ngoài phần lõi bắt buộc, tôi thêm các chi tiết **chỉ ở lớp hiển thị** (không đổi đầu ra headless):
 
-1. **Nhân vật Mây** có nón lá và đèn lồng nhỏ phát sáng ấm quanh người (theo đúng mô tả PRD).
-2. **Không khí đêm cổ tích:** bầu trời sao, sương mù, đèn vàng cam ấm áp, Bóng Mực tím đen bồng bềnh.
-3. **Hiệu ứng:** vòng sóng khi tỏa sáng, chớp đỏ khi bị chạm, đom đóm bồng bềnh có quầng sáng, đảo sáng dần khi thắp đèn, nhảy có chuyển động.
-4. **Trang trí đảo:** cây và đá rải rác.
-
-Các phần thêm đều là hình học dựng sẵn (procedural), không dùng asset ngoài (xem [CREDITS.md](CREDITS.md)).
-
----
-
-## Cấu trúc repo
-
-```text
-game.contract.json        Khai báo Test Contract v1.0 + tuning
-src/
-  core/sim.js             Engine logic (dùng chung headless + 3D)
-  core/constants.js       Tuning + hằng số thiết kế
-  core/rng.js             RNG tất định (mulberry32)
-  headless.js             Chế độ headless (CLI)
-  server.js               Máy chủ tĩnh cho game web
-  render/main.js          Đồ họa 3D (Three.js)
-  vendor/three.module.js  Three.js (vendor, chạy offline)
-index.html                Trang game + HUD
-tests/run_tests.mjs       Bộ test (npm test)
-tests/make_proof.mjs      Sinh bằng chứng JSONL
-docs/notes/               Giả định, nhật ký dùng AI, retro
-docs/proof/phase-1/       Bằng chứng kiểm chứng
-```
+1. Nhân vật Mây với nón lá, khăn đỏ và đèn lồng nhỏ phát sáng ấm.
+2. Không khí đêm cổ tích: sao trời, sương mù, biển mây, đảo sáng dần khi thắp đèn.
+3. Hiệu ứng: vòng sóng khi Tỏa Sáng, chớp đỏ khi bị đánh, đom đóm bồng bềnh, Bóng Mực phát viền tím.
+4. Trang trí đảo: cây, đá, cầu tre, tháp chuông.
+5. Âm thanh **thủ tục** (WebAudio, không asset ngoài): nhạc nền + hiệu ứng nhặt/thắp/tỏa sáng/bị đánh/nhảy/lướt/thắng/thua/đếm ngược.
 
 ## Giấy phép & nguồn
 
-- Mã nguồn: MIT ([LICENSE](LICENSE)).
-- Tài sản/âm thanh: toàn bộ tạo thủ tục bằng Three.js primitives, không asset ngoài ([CREDITS.md](CREDITS.md)).
+- Mã nguồn: MIT ([LICENSE](LICENSE)). Toàn bộ hình ảnh/âm thanh tạo thủ tục, không asset ngoài ([CREDITS.md](CREDITS.md)).

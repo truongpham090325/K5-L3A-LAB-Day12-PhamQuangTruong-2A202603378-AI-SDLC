@@ -1,23 +1,24 @@
-# Retro — Phase 1
+# Retro
 
 ## Điều hiệu quả
 
-- **Tách logic/ hiển thị ngay từ đầu** là quyết định tốt nhất: headless (chấm tự động) và game 3D dùng chung một `Game`, nên không bao giờ lệch nhau.
-- **Kiểm chứng trước khi viết** giúp agent làm đúng ngay, giảm vòng lặp sửa.
-- **Test đơn vị trên engine logic** cho vòng phản hồi gần như tức thì, rẻ token.
+- **Tách logic/ hiển thị** là quyết định tốt nhất: Phase 2 chỉ cần viết lại `sim.js`, game 3D "chỉ" hiển thị lại, không viết 2 lần.
+- **Đọc kỹ ticket trước khi code**: phần "số liệu chuẩn" được gom hết vào `constants.js` + `game.contract.json` (khớp bằng test), tránh sai lệch.
+- **Test đơn vị trên engine** cho vòng phản hồi gần như tức thì; hiệu năng Đêm đầy đủ 21600 tick chỉ 173ms.
+- **Âm thanh thủ tục** (WebAudio) đáp ứng yêu cầu âm thanh mà không cần asset ngoài.
 
 ## Điều chưa tốt
 
-- Mất thời gian debug công cụ (server nền, chụp màn hình headless) không liên quan đến yêu cầu. Cần cô lập sớm.
-- Chưa kịp quay video demo (dự kiến Phase 4).
+- Chưa đo được FPS thật (≥30 FPS @1280×720) vì môi trường chạy headless không render; cần đo khi quay video ở Phase 4.
+- Một số giả định (chiều cao tâm Bóng Mực = mặt đất+1m, `wander` đứng yên) là lựa chọn chủ quan — đã ghi rõ trong `assumptions.md` để người chấm hiểu.
 
-## Số liệu Phase 1
+## Số liệu đến hết Phase 2
 
-- 17 test (14 đơn vị + 3 tích hợp CLI) đạt.
-- 9 file bằng chứng JSONL thật.
-- ~40k token ước tính.
+- 24 test (đơn vị + tích hợp CLI) đạt.
+- Đêm đầy đủ 21600 tick: 173ms.
+- ~76k token ước tính cho Phase 2.
 
 ## Nếu làm lại
 
-- Viết trước một **skill "chạy headless + lưu bằng chứng"** để không phải lặp lại thao tác tay.
-- Định sẵn **danh sách scenario chuẩn** cho từng yêu cầu ngay khi đọc PRD, thay vì vừa làm vừa nghĩ.
+- Viết **skill "chạy headless + lưu bằng chứng"** sớm hơn (đang làm tay qua script `make_proof.mjs`).
+- Định trước **bảng ánh xạ yêu cầu → scenario** ngay khi đọc ticket để sinh bằng chứng nhanh hơn.
