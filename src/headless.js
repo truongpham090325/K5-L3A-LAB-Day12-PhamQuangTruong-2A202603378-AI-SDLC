@@ -1,8 +1,7 @@
-// Đảo Đèn Lồng — chế độ headless (Test Contract v1.0).
+// Đảo Đèn Lồng — chế độ headless (Test Contract v1.1).
 // Chạy logic game không cần cửa sổ/GPU và ghi kết quả JSONL.
 //
-// Cú pháp:
-//   node src/headless.js --seed <int> --night 1 [--scenario <file.json>]
+//   node src/headless.js --seed <int> --night <1|2|3> [--scenario <file.json>]
 //                        [--inputs <file.json>] --ticks <int> --out <file.jsonl>
 //                        [--snapshot-every <int, mặc định 10>]
 
@@ -43,7 +42,7 @@ async function main() {
   if (!Number.isInteger(seed)) fail('--seed must be an integer', 1);
 
   const night = Number(args.night);
-  if (night !== 1) fail('unsupported night: ' + args.night + ' (only 1 supported)', 1);
+  if (![1, 2, 3].includes(night)) fail('unsupported night: ' + args.night + ' (only 1, 2, 3)', 1);
 
   const ticks = Number(args.ticks);
   if (!Number.isInteger(ticks) || ticks < 0) fail('--ticks must be a non-negative integer', 1);
@@ -59,13 +58,14 @@ async function main() {
   let frames = null;
   if (args.inputs != null) frames = await readInputs(args.inputs);
 
-  const game = new Game({ seed });
+  const game = new Game({ seed, night });
   game.buildScenario(scenario);
 
   const framesByTick = new Map();
   if (frames) for (const f of frames) framesByTick.set(f.tick, f);
 
   const out = [];
+  out.push(JSON.stringify({ type: 'event', tick: 0, name: 'night_start', data: { night } }));
   out.push(JSON.stringify(game.snapshot()));
 
   let ended = false;
@@ -120,12 +120,13 @@ async function readInputs(path) {
     }
     lastTick = f.tick;
     if (f.move != null) {
-      if (
-        !Array.isArray(f.move) ||
-        f.move.length !== 2 ||
-        f.move.some((v) => typeof v !== 'number')
-      ) {
+      if (!Array.isArray(f.move) || f.move.length !== 2 || f.move.some((v) => typeof v !== 'number')) {
         fail('frame.move must be [x, z] of numbers: ' + path, 2);
+      }
+    }
+    for (const k of ['jump', 'interact', 'pulse', 'dash', 'pause']) {
+      if (f[k] != null && typeof f[k] !== 'boolean') {
+        fail('frame.' + k + ' must be a boolean: ' + path, 2);
       }
     }
   }
