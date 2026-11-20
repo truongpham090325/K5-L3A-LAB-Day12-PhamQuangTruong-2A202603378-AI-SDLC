@@ -1,0 +1,12 @@
+{
+  "name": "dao-den-long",
+  "version": "0.1.0",
+  "description": "Đảo Đèn Lồng — game 3D (Day 12 AI SDLC, Phase 1)",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "headless": "node src/headless.js",
+    "test": "node tests/run_tests.mjs"
+  },
+  "license": "MIT"
+}
