@@ -69,9 +69,9 @@ Cài đặt → "Bảng màu dễ phân biệt" (được lưu):
 
 ---
 
-## Chế độ headless (Test Contract v1.2)
+## Chế độ headless (Test Contract v1.3)
 
-Khai báo ở **`game.contract.json`** (v1.2). Hỗ trợ `--night 1|2|3`.
+Khai báo ở **`game.contract.json`** (v1.3). Hỗ trợ `--night 1|2|3`.
 
 ```bash
 node src/headless.js --seed <int> --night <1|2|3> [--scenario file.json] [--inputs file.json] \
@@ -87,9 +87,51 @@ Chi tiết: [`docs/notes/assumptions.md`](docs/notes/assumptions.md), [ADR 3](do
 
 ---
 
+## Chế độ benchmark (mandatory)
+
+```bash
+node src/bench.js --seed 42 --duration 30 --out bench.json
+```
+
+- Chạy game ở cảnh cố định: Đêm 1, 1280×720 (không fullscreen), 200 Bóng Mực (wander), 100 đom đóm, 3 đèn L1–L3 sáng fuel 100, camera orbit rồng 2D, 3 s warmup rồi đo `--duration` giây.
+- Tắt gameplay: không input Mây, không sát thương/nhặt/estate, dùng timer-only.
+- `bench.json` (tự sinh, commit): `avg_fps` ≥ 60, `p1_low_fps` ≥ 30, `load_ms` ≤ 10000.
+
+---
+
+## Soak test (mandatory)
+
+```bash
+node src/soak.js --seed 7 --nights 10 --out soak.json
+```
+
+- Chạy headless **10 Đêm liên tiếp** trong 1 tiến trình (Đêm 1–3 xoay vòng), input ngẫu nhiên theo seed.
+- `soak.json`: `crashes = 0`, bộ nhớ sau ≤ 1.2 × sau đầu (RSS, trên 0.2 MB), `duration_s` thực.
+
+---
+
+## Bảng xếp hạn cục bộ
+
+- Sau màn hình Bình Minh (thắng) hoặc khi bị thua, nhập tên để lưu điểm (tên 3–12 ký tự `[A-Za-z0-9_]`). Mục: tên, tổng điểm các Đêm đã thắng, đêm thắng, thời điểm, seed.
+- Giữ top 10 (sorted by điểm ↓, rơi bằng điểm thì người về trước rơi trên).
+- Màn hình Bảng xếp hạn từ menu chính.
+- Xuất: `npm start -- --export-leaderboard out.json` → `{"entries": [...]}` đúng thứ tự.
+
+---
+
+## Dễ tiếp cận (Accessibility)
+
+Trong **Cài đặt → Trợ nhà**:
+- **Đổi phím:** Mọi hành động (di chuyển/Nhảy/Lướt/Tương tác/Tỏa sáng/Tạm dừng); nhấn để trùng phím được báo.
+- **Giảm chuyển động:** Tắt rung camera + hiệu ứng chớp.
+- **Chữ lớn:** ×1.25 toàn bộ UI.
+- **Phụ đề:** Text màu cho cơ chế nguy hiểm (đèn hết dầu, 10 s cuối, Bóng Mực hút dầu...).
+
+---
+
 ## Kiểm chứng
 
-- **Chạy test:** `npm test` (24 test đơn vị + tích hợp: fuel, drain, relight, mù màu, luật thắng/thua, tính tất định, hiệu năng).
+- **Chạy test:** `npm test` (24 test).
 - **Bằng chứng:** [`docs/proof/phase-3/README.md`](docs/proof/phase-3/README.md).
 
 ---
