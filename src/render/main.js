@@ -89,6 +89,13 @@ let yawDeg = 0;
 let locked = false;
 let flashT = 0;
 let colorBlind = false;
+let leaderboard = [];
+let nightsWon = 0;
+let reducedMotion = false;
+let bigFont = false;
+let subtitles = false;
+let bench = null;
+let benchStartT = 0;
 const keys = {};
 
 const terrainGroup = new THREE.Group();
@@ -401,17 +408,53 @@ $('btn-start').onclick = () => {
 $('btn-settings').onclick = () => show('settings');
 $('btn-settings2').onclick = () => show('settings');
 $('btn-settings-done').onclick = () => {
-  settings = { music: +$('set-music').value, sfx: +$('set-sfx').value, sensitivity: +$('set-sens').value, colorBlind: !!$('set-cb').checked };
+  settings = {
+    music: +$('set-music').value, sfx: +$('set-sfx').value, sensitivity: +$('set-sens').value,
+    colorBlind: !!$('set-cb').checked, reducedMotion: !!$('set-motion').checked,
+    bigFont: !!$('set-bigfont').checked, subtitles: !!$('set-subtitles').checked,
+  };
   audio.saveSettings(settings);
   audio.setMusicVolume(settings.music);
   audio.setSfxVolume(settings.sfx);
   colorBlind = settings.colorBlind;
+  applyAccessibility();
   show(paused ? 'pause-menu' : 'menu');
 };
 $('set-music').value = settings.music;
 $('set-sfx').value = settings.sfx;
 $('set-sens').value = settings.sensitivity;
 $('set-cb').checked = !!settings.colorBlind;
+$('set-motion').checked = !!settings.reducedMotion;
+$('set-bigfont').checked = !!settings.bigFont;
+$('set-subtitles').checked = !!settings.subtitles;
+
+function applyAccessibility() {
+  reducedMotion = settings.reducedMotion;
+  bigFont = settings.bigFont;
+  subtitles = settings.subtitles;
+  const appEl = document.getElementById('app');
+  appEl.style.transform = bigFont ? 'scale(1.25)' : '';
+  moon.position.y = 40; // chốt tại rạnh mây (không rung) khi reducedMotion
+  $('subtitles').hidden = !subtitles || phase !== 'playing';
+  updateSubtitles();
+}
+
+function updateSubtitles() {
+  const el = $('subtitles');
+  const cues = [];
+  if (game && game.state === 'playing') {
+    const timeLeft = game.durationS - game.simTick / 60;
+    if (timeLeft <= 10 && timeLeft > 0) cues.push('10 s cuối');
+    const warn = game.lanterns.find((l) => l.lit && l.fuel < P.low_fuel_threshold * 60);
+    if (warn) cues.push('Đèn "' + warn.id + '" sắp hết dầu');
+    const drainShades = game.shades.filter((s) => s.state === 'drain');
+    if (drainShades.length) cues.push('Bóng Mực đang hút dầu: ' + drainShades.map((s) => s.id).join(','));
+    const half = game.lanterns.filter((l) => !l.lit && l.deposited > 0).map((l) => l.id);
+    if (half.length) cues.push('Đèn chưa sáng: ' + half.slice(0, 3).join(','));
+  }
+  el.textContent = cues.join(' · ');
+  el.hidden = !subtitles || phase !== 'playing' || el.textContent === '';
+}
 
 function startNight(n) {
   currentNight = n;
@@ -448,16 +491,54 @@ $('btn-again').onclick = () => {
 $('btn-next').onclick = () => {
   if (game.state === 'won') {
     totalScore += game.score;
+    nightsWon++;
     if (currentNight < 3) startNight(currentNight + 1);
     else {
       $('total-score').textContent = 'Tổng điểm: ' + totalScore;
       show('sunrise');
       phase = 'sunrise';
+      saveToLeaderboard();
     }
   } else {
-    startNight(currentNight); // thua -> chơi lại đêm đó
+    startNight(currentNight);
   }
 };
+
+async function loadLeaderboard() {
+  try {
+    const d = await (await fetch('/api/leaderboard')).json();
+    leaderboard = (d && d.entries) || [];
+  } catch (e) { leaderboard = []; }
+}
+
+function showLeaderboard() {
+  const t = $('leaderboard-tbody');
+  t.innerHTML = '';
+  leaderboard.slice(0, 10).forEach((e, i) => {
+    const tr = document.createElement('tr');
+    const rank = document.createElement('td'); rank.textContent = (i + 1).toString();
+    const name = document.createElement('td'); name.textContent = e.name;
+    const score = document.createElement('td'); score.textContent = String(e.score);
+    const nights = document.createElement('td'); nights.textContent = String(e.nights_won);
+    const when = document.createElement('td'); when.textContent = (e.achieved_at || '').slice(5, 16);
+    tr.appendChild(rank); tr.appendChild(name); tr.appendChild(score); tr.appendChild(nights); tr.appendChild(when);
+    t.appendChild(tr);
+  });
+  show('leaderboard');
+}
+
+function saveToLeaderboard() {
+  const name = (window.prompt('Mây đã thắng! Nhập tên của bạn để lưu điểm (3–12 ký tự [A-Za-z0-9_]):', '') || '').trim();
+  if (!/^[A-Za-z0-9_]{3,12}$/.test(name)) {
+    window.alert('Tên phải từ 3–12 ký tự [A-Za-z0-9_].');
+    return;
+  }
+  const entry = { name, score: totalScore, nights_won: nightsWon, achieved_at: new Date().toISOString(), seed: game.seed };
+  const entries = [...leaderboard, entry].sort((a, b) => (b.score - a.score) || new Date(b.achieved_at).getTime() - new Date(a.achieved_at).getTime()).slice(0, 10);
+  leaderboard = entries;
+  fetch('/api/leaderboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entries }) })
+    .then(() => showLeaderboard());
+}
 
 function showResult() {
   phase = 'result';
@@ -466,9 +547,13 @@ function showResult() {
     $('result-sub').textContent = 'Thắng! Điểm đêm này: ' + game.score;
   } else {
     $('result-title').textContent = '💫 Thua cuộc';
-    $('result-sub').textContent = 'Điểm: ' + game.score;
+    $('result-sub').textContent = 'Điểm: ' + totalScore;
   }
   show('result');
+}
+
+function onGameOver() {
+  showResult();
   if (document.pointerLockElement) document.exitPointerLock();
 }
 
@@ -551,6 +636,8 @@ function updateHUD() {
   } else {
     arrowEl.classList.add('hidden');
   }
+
+  updateSubtitles();
 }
 
 // ---------- vòng lặp ----------
@@ -692,10 +779,128 @@ function syncScene(dt) {
   camera.lookAt(p.pos[0], p.pos[1] + 1.6, p.pos[2]);
 }
 
+// ---------- Bench (cảnh benchmark, đo FPS) ----------
+function runBench(duration) {
+  const params = new URLSearchParams(location.search);
+  const seed = Number(params.get('seed') || 42);
+  bench = {
+    duration: duration,
+    warmupMs: 3000,
+    startT: performance.now(),
+    frames: [],
+    done: false,
+  };
+  benchStartT = bench.startT;
+  show(null);
+  phase = 'bench';
+  startBenchScene(seed);
+}
+
+function startBenchScene(seed) {
+  game = new Game({ seed, night: 1 });
+  buildTerrain(1);
+  clearGroup(entityGroup);
+  lanternMeshes.clear(); moteMeshes.clear(); shadeMeshes.clear(); drifterMeshes.clear(); charmMeshes.clear();
+  // 3 đèn L1–L3 đang sáng fuel 100; L4–L5 tắt
+  for (const l of game.lanterns) {
+    buildLantern(l);
+    l.lit = game.lanterns.indexOf(l) < 3;
+    l.fuel = 6000;
+  }
+  // 200 Bóng Mực (wander), 100 đom đóm
+  for (let i = 0; i < 200; i++) {
+    const a = (i / 200) * Math.PI * 2;
+    const r = 10 + (i % 22);
+    const sh = { id: 'B_' + i, pos: [Math.cos(a) * r, 1.0, Math.sin(a) * r], state: 'wander', seed: i };
+    game.shades.push(sh);
+    addShadeMesh(sh);
+  }
+  for (let i = 0; i < 100; i++) {
+    const a = (i / 100) * Math.PI * 2;
+    const r = 8 + (i % 18);
+    game.motes.push({ id: 'Bm_' + i, pos: [Math.cos(a) * r, 0, Math.sin(a) * r], kind: 'random', ttlTicks: null });
+    addMoteMesh(game.motes[game.motes.length - 1]);
+  }
+  playerGroup = buildPlayer();
+  scene.add(playerGroup);
+  playerGroup.position.set(0, 0, 0);
+  ambient.intensity = 0.35 + 0.55 * (game.lanterns.filter((l) => l.lit).length / 5) * 0.9;
+}
+
+function doBenchFrame(dt) {
+  if (bench.done) return;
+  const nowT = performance.now() / 1000;
+  const wobble = nowT * 0.3;
+  for (const sh of game.shades) {
+    sh.pos[0] += Math.sin(wobble + sh.seed * 0.13) * 0.4;
+    sh.pos[2] += Math.cos(wobble + sh.seed * 0.07) * 0.4;
+    const m = shadeMeshes.get(sh.id);
+    if (m) m.position.set(sh.pos[0], sh.pos[1], sh.pos[2]);
+  }
+  const a = (nowT / 15) * 2 * Math.PI;
+  camera.position.set(30 * Math.cos(a), 15, 30 * Math.sin(a));
+  camera.lookAt(0, 0, 0);
+  const elapsed = nowT - bench.startT / 1000;
+  bench.frames.push({ t: elapsed, dt: dt });
+  if (elapsed > bench.duration + bench.warmupMs / 1000 + 0.5) benchFinish();
+}
+
+function benchFinish() {
+  if (bench.done) return;
+  bench.done = true;
+  const framesAll = bench.frames;
+  const warmS = bench.warmupMs / 1000;
+  const frames = framesAll.filter((f) => f.t >= warmS && f.t <= warmS + bench.duration);
+  const dtMs = frames.map((f) => f.dt * 1000);
+  const N = dtMs.length;
+  const sumDt = dtMs.reduce((a, b) => a + b, 0);
+  const avgFps = N > 0 && sumDt > 0 ? (1000 * N) / sumDt : 0;
+
+  const k = Math.max(1, Math.ceil(0.01 * N));
+  const sortedWorst = [...dtMs].sort((a, b) => b - a).slice(0, k);
+  const meanWorst = sortedWorst.reduce((a, b) => a + b, 0) / sortedWorst.length;
+  const p1LowFps = meanWorst > 0 ? 1000 / meanWorst : 0;
+
+  const sorted = [...dtMs].sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.floor(0.95 * sorted.length));
+  const frameMsP95 = sorted.length ? sorted[idx] : 0;
+
+  const loadMs = framesAll.length > 0 ? Math.round(framesAll[0].t * 1000) : 0;
+  const peakMem = typeof performance.memory !== 'undefined' ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null;
+  const result = {
+    contract_version: '1.3',
+    avg_fps: +avgFps.toFixed(1),
+    p1_low_fps: +p1LowFps.toFixed(1),
+    frame_ms_p95: +frameMsP95.toFixed(1),
+    frames: N,
+    load_ms: loadMs,
+    peak_mem_mb: peakMem,
+    vsync_off: false,
+    renderer: 'Three.js 0.160.0 (vendored), WebGL, shader sRGB',
+    os: navigator.platform || 'unknown',
+  };
+  fetch('/api/bench', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) })
+    .catch(() => {})
+    .finally(() => {
+      const info = document.createElement('div');
+      info.id = 'bench-result';
+      info.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,10,30,0.95);color:#F5F1E6;font:20px system-ui;z-index:99';
+      info.textContent = 'Bench: avg_fps ' + result.avg_fps + ', p1_low_fps ' + result.p1_low_fps + ', frames ' + N;
+      document.body.appendChild(info);
+    });
+}
+
 function loop(t) {
   requestAnimationFrame(loop);
   const dt = Math.min((t - lastT) / 1000, 0.25);
   lastT = t;
+
+  if (bench) {
+    doBenchFrame(dt);
+    renderer.render(scene, camera);
+    return;
+  }
+
   acc += dt;
 
   if (phase === 'playing' && game && game.state === 'playing' && !paused) {
@@ -707,7 +912,7 @@ function loop(t) {
       steps++;
       if (game.state !== 'playing') break;
     }
-    if (game.state !== 'playing') showResult();
+    if (game.state !== 'playing') onGameOver();
   } else {
     acc = 0;
   }
@@ -730,7 +935,7 @@ function loop(t) {
     }
   }
 
-  if (flashT > 0) {
+  if (!reducedMotion && flashT > 0) {
     flashT -= dt;
     flashEl.style.opacity = String(Math.min(1, flashT * 4));
   } else if (flashEl.style.opacity !== '0') {
@@ -749,3 +954,14 @@ window.addEventListener('resize', () => {
 });
 
 requestAnimationFrame(loop);
+
+// Bench: kích hoạt tự động khi URL có tham số ?bench=1
+// Leaderboard & Leaderboard-close
+$('leaderboard-close').onclick = () => show('menu');
+
+window.addEventListener('load', async () => {
+  await loadLeaderboard();
+  applyAccessibility();
+  const params = new URLSearchParams(location.search);
+  if (params.get('bench') === '1') runBench(Number(params.get('duration') || 30));
+});

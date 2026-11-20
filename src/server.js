@@ -2,13 +2,26 @@
 // Chạy bằng: node src/server.js  (hoặc npm start)
 
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { extname, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
+let benchResult = null;
+let leaderboardPath = resolve(ROOT, 'leaderboard.json');
+async function readLeaderboard() {
+  try {
+    const data = JSON.parse(await readFile(leaderboardPath, 'utf8'));
+    return data;
+  } catch {
+    return { entries: [] };
+  }
+}
+async function saveLeaderboard(lb) {
+  await writeFile(leaderboardPath, JSON.stringify(lb, null, 2), 'utf8');
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -30,6 +43,55 @@ const server = http.createServer(async (req, res) => {
   try {
     let urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if (urlPath === '/') urlPath = '/index.html';
+
+    // POST /api/bench — nhận metrics bench từ trình duyệt, ghi bench.json
+    if (req.method === 'POST' && urlPath === '/api/bench') {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', async () => {
+        try {
+          benchResult = JSON.parse(body);
+          await writeFile(resolve(ROOT, 'bench.json'), JSON.stringify(benchResult, null, 2), 'utf8');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end('{"ok":true}');
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('bad bench payload');
+        }
+      });
+      return;
+    }
+    // GET /api/bench-status
+    if (req.method === 'GET' && urlPath === '/api/bench-status') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(benchResult));
+      return;
+    }
+
+    // GET /api/leaderboard
+    if (req.method === 'GET' && urlPath === '/api/leaderboard') {
+      const lb = await readLeaderboard();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(lb));
+      return;
+    }
+    // POST /api/leaderboard — cập nhật bảng xếp hạn (lưu leaderboard.json)
+    if (req.method === 'POST' && urlPath === '/api/leaderboard') {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', async () => {
+        try {
+          await saveLeaderboard(JSON.parse(body));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end('{"ok":true}');
+        } catch {
+          res.writeHead(400);
+          res.end('bad');
+        }
+      });
+      return;
+    }
+
     const filePath = resolve(ROOT, '.' + urlPath);
     if (!filePath.startsWith(ROOT)) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -45,6 +107,18 @@ const server = http.createServer(async (req, res) => {
     res.end('Not found: ' + req.url);
   }
 });
+
+// Chế độ xuất bảng xếp hạn: npm start -- --export-leaderboard out.json
+if (process.argv[2] === '--export-leaderboard') {
+  (async () => {
+    const out = process.argv[3] || 'leaderboard.json';
+    const lb = await readLeaderboard();
+    const entries = (lb.entries || []).slice().sort((a, b) => (b.score - a.score) || new Date(b.achieved_at).getTime() - new Date(a.achieved_at).getTime());
+    await writeFile(out, JSON.stringify({ entries }, null, 2), 'utf8');
+    console.log('Xuất bảng xếp hạn -> ' + out + ' (' + entries.length + ' mục)');
+    process.exit(0);
+  })();
+}
 
 server.listen(PORT, () => {
   const url = 'http://localhost:' + PORT;
