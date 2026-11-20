@@ -1,0 +1,13 @@
+{
+  "contract_version": "1.3",
+  "avg_fps": null,
+  "p1_low_fps": null,
+  "frame_ms_p95": null,
+  "frames": null,
+  "load_ms": null,
+  "peak_mem_mb": null,
+  "vsync_off": false,
+  "renderer": "Three.js 0.160.0 (vendored), WebGL, shader sRGB",
+  "os": "",
+  "note": "Đo với browser bench (cảnh: 200 Bóng Mực, 100 đom đóm, 3 đèn L1–L3, camera vòng tròn radius 30 m/height 15 m, resolution 1280x720). bench_cmd = node src/bench.js --seed 42 --duration 30 --out bench.json. Browser bench đã load không có lỗi console (verified). Run on visible browser to fill metrics."
+}
