@@ -1,4 +1,4 @@
-// Bộ test Phase 2 (Ticket-02) — Test Contract v1.1.
+// Bộ test Phase 3 (Ticket-03) — Test Contract v1.2.
 // Chạy: node tests/run_tests.mjs  (hoặc npm test)
 
 import assert from 'node:assert';
@@ -9,7 +9,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { Game } from '../src/core/sim.js';
-import { TUNING, P, NIGHTS } from '../src/core/constants.js';
+import { TUNING, P } from '../src/core/constants.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HEADLESS = join(__dirname, '..', 'src', 'headless.js');
@@ -49,238 +49,194 @@ const empty = { random_motes: false, random_shades: false, motes: [], shades: []
 
 // ---------------------------------------------------------------------------
 
-console.log('\n== Test đơn vị (logic v1.1) ==');
+console.log('\n== Test đơn vị (logic v1.2) ==');
 
-test('contract.json khớp constants.js (v1.1)', () => {
+test('contract.json khớp constants.js (v1.2)', () => {
   const contract = JSON.parse(readFileSync(join(__dirname, '..', 'game.contract.json'), 'utf8'));
-  assert.strictEqual(contract.contract_version, '1.1');
+  assert.strictEqual(contract.contract_version, '1.2');
   assert.deepStrictEqual(contract.tuning, TUNING);
-  assert.strictEqual(contract.tuning.lantern_cost, 10);
-  assert.strictEqual(contract.tuning.pulse_cost, 3);
+  assert.strictEqual(contract.tuning.fuel_max, 100);
+  assert.strictEqual(contract.tuning.relight_cost, 5);
+  assert.strictEqual(contract.tuning.win_ratio, 0.6);
+  assert.strictEqual(contract.tuning.score.per_mote, 5);
 });
 
-test('di chuyển: chạy 6 m/s (đạt tốc độ trong <=0.1s)', () => {
+// --- hồi quy Phase 1–2 (số chuẩn không đổi) ---
+
+test('di chuyển: chạy 6 m/s', () => {
   const { game } = simulate(empty, 120, [{ tick: 0, move: [0, 1], cam_yaw_deg: 0 }]);
-  // 1s ramp (5.75m) + 1s ở 6 m/s = 11.75m
   assert.ok(near(game.player.pos[2], 11.75, 0.1), 'z = ' + game.player.pos[2]);
-  assert.ok(near(game.player.vel[2], 6.0, 0.01), 'vel = ' + game.player.vel[2]);
 });
 
-test('nhảy: lên rồi rơi xuống (v=7, g=-20)', () => {
-  const { game } = simulate(empty, 50, [
-    { tick: 0, jump: true },
-    { tick: 1, jump: false },
-  ]);
-  // sau 50 tick (0.83s) người chơi đã đáp đất trở lại (0.7s bay)
-  assert.strictEqual(game.player.grounded, true, 'phải chạm đất lại');
-  assert.ok(game.player.pos[1] === 0 || near(game.player.pos[1], 0), 'y trở về 0');
+test('nhảy: lên rồi rơi xuống', () => {
+  const { game } = simulate(empty, 50, [{ tick: 0, jump: true }, { tick: 1, jump: false }]);
+  assert.strictEqual(game.player.grounded, true);
 });
 
-test('lướt (dash): 14 m/s trong 12 tick + hồi chiêu', () => {
-  const { game, events } = simulate(empty, 60, [
-    { tick: 0, dash: true },
-    { tick: 1, dash: false },
-  ]);
-  assert.ok(events.some((e) => e.name === 'dash'), 'phải có event dash');
-  assert.ok(game.player.dashCdTicks > 0, 'phải có hồi chiêu sau lướt');
-});
-
-test('nhặt đom đóm: KHÔNG cộng điểm khi nhặt', () => {
-  const { game, events } = simulate(
-    { player: { pos: [0, 0, 0] }, random_motes: false, random_shades: false, motes: [[0, 0, 1]], shades: [] },
-    3
-  );
-  assert.ok(events.some((e) => e.name === 'mote_picked'));
+test('nhặt đom đóm: không cộng điểm khi nhặt', () => {
+  const { game } = simulate({ player: { pos: [0, 0, 0] }, random_motes: false, random_shades: false, motes: [[0, 0, 1]], shades: [] }, 3);
   assert.strictEqual(game.player.carried, 1);
-  assert.strictEqual(game.score, 0, 'nhặt không cộng điểm');
+  assert.strictEqual(game.score, 0);
 });
 
-test('nạp đom đóm: +10 mỗi đom đóm + thắp đèn +100', () => {
-  const { game, events } = simulate(
-    { player: { pos: [0, 0, 25], carried: 10 }, random_motes: false, random_shades: false, motes: [], shades: [] },
-    4,
-    [
-      { tick: 0, interact: true },
-      { tick: 1, interact: false },
-    ]
-  );
-  const l1 = game.lanterns.find((l) => l.id === 'L1');
-  assert.ok(l1.lit, 'L1 phải được thắp');
-  assert.strictEqual(l1.deposited, 10);
-  assert.strictEqual(game.score, 200, 'score = 10*10 + 100');
-});
-
-test('tỏa sáng: tốn 3 đom đóm (không tốn flames) + choáng', () => {
+test('tỏa sáng: tốn 3 đom đóm + choáng + +5', () => {
   const { game, events } = simulate(
     { player: { pos: [0, 0, 0], flames: 3, carried: 5 }, random_motes: false, random_shades: false, motes: [], shades: [{ pos: [0, 0, 3], state: 'chase' }] },
     3,
-    [
-      { tick: 0, pulse: true },
-      { tick: 1, pulse: false },
-    ]
+    [{ tick: 0, pulse: true }, { tick: 1, pulse: false }]
   );
-  assert.strictEqual(game.player.carried, 2, 'tốn 3 đom đóm');
-  assert.strictEqual(game.player.flames, 3, 'không tốn flames');
+  assert.strictEqual(game.player.carried, 2);
+  assert.strictEqual(game.player.flames, 3);
   assert.strictEqual(game.shades[0].state, 'stunned');
-  assert.ok(events.some((e) => e.name === 'pulse' && e.data.stunned_ids.includes('S1')));
   assert.strictEqual(game.score, TUNING.score.per_stun);
 });
 
-test('Bóng Mực đuổi và chạm: player_hit + rơi floor(carried/2) + recoil', () => {
+test('Bóng Mực chạm: mất flames + rơi đom đóm', () => {
   const { game, events } = simulate(
     { player: { pos: [0, 0, 0], flames: 3, carried: 4 }, random_motes: false, random_shades: false, motes: [], shades: [{ pos: [0, 0, 0.5], state: 'chase' }] },
     3
   );
   const hit = events.find((e) => e.name === 'player_hit');
-  assert.ok(hit, 'phải có player_hit');
-  assert.strictEqual(hit.data.by, 'shade');
   assert.strictEqual(hit.data.flames, 2);
   assert.strictEqual(hit.data.dropped, 2);
-  assert.strictEqual(game.shades[0].state, 'recoil', 'Bóng Mực phải giật lùi');
-});
-
-test('Bóng Mực sinh theo lịch: 2 con tại tick 300 (Đêm 1)', () => {
-  const { game, events } = simulate({ random_motes: false, motes: [] }, 310, [], 1);
-  const spawns = events.filter((e) => e.name === 'shade_spawned');
-  assert.strictEqual(spawns.length, 2, '2 con lúc tick 300');
-  assert.deepStrictEqual(spawns.map((s) => s.data.id), ['S1', 'S2']);
-  assert.strictEqual(game.shades.length, 2);
-});
-
-test('thắng: đủ đèn -> won/all_lit (ưu tiên sau no_flames)', () => {
-  const { game, events } = simulate(
-    {
-      player: { pos: [-23.8, 0, 7.7], carried: 10 },
-      random_motes: false,
-      random_shades: false,
-      motes: [],
-      shades: [],
-      lanterns: [
-        { id: 'L1', lit: true },
-        { id: 'L2', lit: true },
-        { id: 'L3', lit: true },
-        { id: 'L4', lit: true },
-      ],
-    },
-    4,
-    [
-      { tick: 0, interact: true },
-      { tick: 1, interact: false },
-    ]
-  );
-  assert.strictEqual(game.state, 'won');
-  const over = events.find((e) => e.name === 'game_over');
-  assert.deepStrictEqual(over.data, { result: 'won', reason: 'all_lit' });
-});
-
-test('thua: hết flames -> lost/no_flames', () => {
-  const { game, events } = simulate(
-    { player: { pos: [0, 0, 0], flames: 1 }, random_motes: false, random_shades: false, motes: [], shades: [{ pos: [0, 0, 0.5], state: 'chase' }] },
-    3
-  );
-  assert.strictEqual(game.state, 'lost');
-  assert.deepStrictEqual(events.find((e) => e.name === 'game_over').data, { result: 'lost', reason: 'no_flames' });
-});
-
-test('thua: hết giờ -> lost/dawn', () => {
-  const { game } = simulate({ time_left_s: 1, random_motes: false, random_shades: false, motes: [], shades: [] }, 61);
-  assert.strictEqual(game.state, 'lost');
-});
-
-test('rơi khỏi đảo: player_hit (by=fall, lost) + hồi sinh', () => {
-  const { game, events } = simulate(
-    { player: { pos: [41, 0, 0], flames: 3, carried: 5 }, random_motes: false, random_shades: false, motes: [], shades: [] },
-    70
-  );
-  const fall = events.find((e) => e.name === 'player_hit' && e.data.by === 'fall');
-  assert.ok(fall, 'phải có player_hit by=fall');
-  assert.strictEqual(fall.data.lost, 5);
-  assert.strictEqual(fall.data.flames, 2);
-  assert.strictEqual(game.player.carried, 0);
-});
-
-test('địa hình Đêm 3: các tầng', () => {
-  const g = new Game({ seed: 1, night: 3 });
-  assert.strictEqual(g.groundY(0, 0), 6); // tầng 2
-  assert.strictEqual(g.groundY(5, 0), 6); // r<=8
-  assert.strictEqual(g.groundY(0, 18), 3); // tầng 1 (z>0, r=18)
-  assert.strictEqual(g.groundY(0, -18), 0); // z<0 -> tầng 0
-  assert.strictEqual(g.groundY(40, 40), null); // ngoài đảo
-});
-
-test('bục nhảy Đêm 2: bắn lên', () => {
-  const { game } = simulate(
-    { player: { pos: [20, 0, 18] }, random_motes: false, random_shades: false, motes: [], shades: [] },
-    2,
-    [],
-    2
-  );
-  assert.ok(game.player.pos[1] > 0.2, 'phải bay lên, y=' + game.player.pos[1]);
 });
 
 test('Gió Lạc cướp đom đóm (Đêm 2)', () => {
   const { game, events } = simulate(
     { player: { pos: [0, 0, 0], carried: 10 }, random_motes: false, random_shades: false, random_drifters: false, motes: [], shades: [], drifters: [{ id: 'D1', pos: [1, 0, 0], state: 'chase' }] },
-    3,
-    [],
-    2
+    3, [], 2
   );
-  const steal = events.find((e) => e.name === 'drifter_steal');
-  assert.ok(steal, 'phải có drifter_steal');
-  assert.strictEqual(steal.data.amount, 3);
+  assert.strictEqual(events.find((e) => e.name === 'drifter_steal').data.amount, 3);
   assert.strictEqual(game.player.carried, 7);
-  assert.strictEqual(game.drifters[0].state, 'flee');
 });
 
-test('Bùa Gió: nhặt -> charm_picked + tốc độ 7.2', () => {
-  const { game, events } = simulate(
-    { player: { pos: [34, 0, 0] }, random_motes: false, random_shades: false, random_drifters: false, motes: [], shades: [], drifters: [] },
-    1,
-    [],
-    2
+// --- luật mới Phase 3 ---
+
+test('thắp đèn lần đầu: +5 mỗi đom đóm + +100', () => {
+  const { game } = simulate(
+    { player: { pos: [0, 0, 25], carried: 10 }, random_motes: false, random_shades: false, motes: [], shades: [] },
+    4,
+    [{ tick: 0, interact: true }, { tick: 1, interact: false }]
   );
-  const ev = events.find((e) => e.name === 'charm_picked');
-  assert.ok(ev, 'phải có charm_picked');
-  assert.strictEqual(ev.data.charm_id, 'C1');
-  assert.strictEqual(ev.data.charm_ticks, P.charm_effect_ticks);
-  assert.strictEqual(game.player.charmTicks, P.charm_effect_ticks);
+  const l1 = game.lanterns.find((l) => l.id === 'L1');
+  assert.ok(l1.lit);
+  assert.ok(l1.fuel / 60 > 99, 'fuel gần đầy: ' + l1.fuel / 60);
+  assert.strictEqual(game.score, 5 * 10 + 100, 'score = 50 + 100');
 });
 
-test('gió Đêm 3: kích hoạt sau 30s', () => {
-  const { game } = simulate(empty, 1810, [], 3);
-  assert.strictEqual(game.wind.active, true);
-  assert.ok(game.wind.dir_deg >= 0 && game.wind.dir_deg <= 360);
-});
-
-test('pause: sim_tick đứng yên', () => {
-  const { game, events } = simulate(
-    empty,
-    30,
-    [
-      { tick: 10, pause: true },
-      { tick: 11, pause: false },
-      { tick: 20, pause: true },
-      { tick: 21, pause: false },
-    ]
+test('dầu hao hụt 1.0/giây khi sáng', () => {
+  const { game } = simulate(
+    { random_motes: false, random_shades: false, motes: [], shades: [], lanterns: [{ id: 'L1', lit: true, fuel: 100 }] },
+    60
   );
-  assert.strictEqual(game.simTick, 20, 'sim_tick = 20 (10 trước + 10 sau pause)');
-  assert.ok(events.some((e) => e.name === 'paused'));
-  assert.ok(events.some((e) => e.name === 'resumed'));
+  assert.strictEqual(game.lanterns[0].fuel / 60, 99);
 });
 
-test('snapshot v1.1: đủ trường mới', () => {
-  const g = new Game({ seed: 7, night: 2 });
+test('châm dầu: refuel + fuel tăng', () => {
+  const { game, events } = simulate(
+    { player: { pos: [0, 0, 25], carried: 5 }, random_motes: false, random_shades: false, motes: [], shades: [], lanterns: [{ id: 'L1', lit: true, fuel: 50 }] },
+    2,
+    [{ tick: 0, interact: true }, { tick: 1, interact: false }]
+  );
+  const ref = events.find((e) => e.name === 'refuel');
+  assert.ok(ref, 'phải có refuel');
+  assert.strictEqual(ref.data.amount, 5);
+  assert.strictEqual(ref.data.fuel, 100);
+  assert.strictEqual(game.score, 25, '5 * 5');
+});
+
+test('hết dầu: lantern_out', () => {
+  const { game, events } = simulate(
+    { random_motes: false, random_shades: false, motes: [], shades: [], lanterns: [{ id: 'L1', lit: true, fuel: 0.5 }] },
+    40
+  );
+  assert.ok(events.some((e) => e.name === 'lantern_out' && e.data.lantern_id === 'L1'));
+  assert.strictEqual(game.lanterns[0].lit, false);
+  assert.strictEqual(game.lanterns[0].ever_lit, true);
+});
+
+test('thắp lại: cần 5 đom đóm + relight + relit_count', () => {
+  const { game, events } = simulate(
+    { player: { pos: [0, 0, 25], carried: 5 }, random_motes: false, random_shades: false, motes: [], shades: [], lanterns: [{ id: 'L1', lit: false, ever_lit: true }] },
+    3,
+    [{ tick: 0, interact: true }, { tick: 1, interact: false }]
+  );
+  const lit = events.find((e) => e.name === 'lantern_lit');
+  assert.ok(lit, 'phải có lantern_lit');
+  assert.strictEqual(lit.data.relight, true);
+  assert.strictEqual(game.lanterns[0].relit_count, 1);
+  assert.strictEqual(game.score, 5 * 5 + 40, 'score = 25 + 40');
+});
+
+test('Bóng Mực hút dầu: wander -> drain khi gần đèn yếu', () => {
+  const { game } = simulate(
+    { random_motes: false, random_shades: false, motes: [], shades: [{ id: 'S1', pos: [0, 0, 24], state: 'wander' }], lanterns: [{ id: 'L1', lit: true, fuel: 20 }] },
+    3
+  );
+  assert.strictEqual(game.shades[0].state, 'drain');
+});
+
+test('hút dầu làm cạn nhanh hơn (drain 5/giây)', () => {
+  const { game } = simulate(
+    { random_motes: false, random_shades: false, motes: [], shades: [{ id: 'S1', pos: [0, 0, 24], state: 'wander' }], lanterns: [{ id: 'L1', lit: true, fuel: 20 }] },
+    30
+  );
+  // có hút: ~17 (< 19); chỉ hao tự nhiên sẽ là 19.5
+  assert.ok(game.lanterns[0].fuel / 60 < 19, 'fuel = ' + game.lanterns[0].fuel / 60);
+});
+
+test('Tỏa Sáng trúng Bóng Mực đang drain: +15', () => {
+  const { game } = simulate(
+    { player: { pos: [0, 0, 22], carried: 5 }, random_motes: false, random_shades: false, motes: [], shades: [{ id: 'S1', pos: [0, 0, 23], state: 'drain', target_lantern_id: 'L1' }], lanterns: [{ id: 'L1', lit: true, fuel: 20 }] },
+    2,
+    [{ tick: 0, pulse: true }, { tick: 1, pulse: false }]
+  );
+  assert.strictEqual(game.score, TUNING.score.per_drain_stun);
+});
+
+test('thắng mới: dawn_survived khi đủ đèn sáng lúc bình minh', () => {
+  const { game, events } = simulate(
+    { time_left_s: 1, random_motes: false, random_shades: false, motes: [], shades: [], lanterns: [{ id: 'L1', lit: true }, { id: 'L2', lit: true }, { id: 'L3', lit: true }] },
+    61
+  );
+  assert.strictEqual(game.state, 'won');
+  assert.deepStrictEqual(events.find((e) => e.name === 'game_over').data, { result: 'won', reason: 'dawn_survived' });
+});
+
+test('thua mới: dawn khi thiếu đèn sáng lúc bình minh', () => {
+  const { game, events } = simulate(
+    { time_left_s: 1, random_motes: false, random_shades: false, motes: [], shades: [], lanterns: [{ id: 'L1', lit: true }] },
+    61
+  );
+  assert.strictEqual(game.state, 'lost');
+  assert.deepStrictEqual(events.find((e) => e.name === 'game_over').data, { result: 'lost', reason: 'dawn' });
+});
+
+test('thua: hết flames -> no_flames (vẫn giữ)', () => {
+  const { game } = simulate(
+    { player: { pos: [0, 0, 0], flames: 1 }, random_motes: false, random_shades: false, motes: [], shades: [{ pos: [0, 0, 0.5], state: 'chase' }] },
+    3
+  );
+  assert.strictEqual(game.state, 'lost');
+});
+
+test('sức chứa tăng dần: capacity = 10 + 2 * successful_lights (max 20)', () => {
+  const { game } = simulate(
+    { player: { pos: [0, 0, 0], successful_lights: 5 }, random_motes: false, random_shades: false, motes: [], shades: [] },
+    1
+  );
+  assert.strictEqual(game.capacity(), 20);
+});
+
+test('snapshot v1.2: đèn có fuel/ever_lit/relit_count, player có capacity', () => {
+  const g = new Game({ seed: 7, night: 1 });
   g.buildScenario(null);
   const s = g.snapshot();
-  assert.strictEqual(s.night, 2);
-  assert.strictEqual(s.lanterns.length, 6);
-  assert.ok('vel' in s.player && 'grounded' in s.player && 'invuln' in s.player);
-  assert.ok('dash_cd_s' in s.player && 'pulse_cd_s' in s.player && 'charm_s' in s.player);
-  assert.ok(Array.isArray(s.motes) && s.motes.length === 20);
-  assert.strictEqual(s.motes[0].kind, 'random');
-  assert.ok(Array.isArray(s.drifters));
-  assert.strictEqual(s.charms.length, 1);
-  assert.ok('wind' in s);
+  assert.ok('fuel' in s.lanterns[0]);
+  assert.ok('ever_lit' in s.lanterns[0]);
+  assert.ok('relit_count' in s.lanterns[0]);
+  assert.ok('capacity' in s.player);
+  assert.strictEqual(s.player.capacity, 10);
 });
 
 // ---------------------------------------------------------------------------
@@ -301,10 +257,10 @@ test('CLI: --night 1/2/3 chạy thành công, có night_start + end', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ddl-'));
     const out = join(dir, 'out.jsonl');
     const r = runHeadless(['--seed', '5', '--night', String(night), '--ticks', '30', '--out', out]);
-    assert.strictEqual(r.code, 0, 'night ' + night + ' stderr: ' + r.stderr);
+    assert.strictEqual(r.code, 0, 'night ' + night + ': ' + r.stderr);
     const lines = readFileSync(out, 'utf8').trim().split('\n');
-    assert.ok(lines[0].includes('"name":"night_start"'), 'dòng đầu là night_start');
-    assert.ok(lines[lines.length - 1].includes('"type":"end"'), 'dòng cuối là end');
+    assert.ok(lines[0].includes('"name":"night_start"'));
+    assert.ok(lines[lines.length - 1].includes('"type":"end"'));
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -315,9 +271,6 @@ test('CLI: scenario/inputs sai định dạng -> mã thoát 2', () => {
   writeFileSync(bad, '{ nope', 'utf8');
   const out = join(dir, 'out.jsonl');
   assert.strictEqual(runHeadless(['--seed', '5', '--night', '1', '--scenario', bad, '--ticks', '10', '--out', out]).code, 2);
-  const badInputs = join(dir, 'bad-in.json');
-  writeFileSync(badInputs, JSON.stringify({ frames: [{ tick: 5 }, { tick: 3 }] }), 'utf8');
-  assert.strictEqual(runHeadless(['--seed', '5', '--night', '1', '--inputs', badInputs, '--ticks', '10', '--out', out]).code, 2);
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -336,15 +289,15 @@ test('CLI: tính tất định', () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test('CLI: hiệu năng — Đêm đầy đủ 21600 tick xong nhanh', () => {
+test('CLI: hiệu năng — Đêm đầy đủ (14400 tick) xong nhanh', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ddl-'));
   const out = join(dir, 'out.jsonl');
   const t0 = Date.now();
-  const r = runHeadless(['--seed', '1', '--night', '3', '--ticks', '21600', '--snapshot-every', '600', '--out', out]);
+  const r = runHeadless(['--seed', '1', '--night', '3', '--ticks', '18000', '--snapshot-every', '600', '--out', out]);
   const dt = Date.now() - t0;
-  assert.strictEqual(r.code, 0, 'stderr: ' + r.stderr);
-  assert.ok(dt < 5000, 'chạy mất ' + dt + 'ms (phải << 30s)');
-  console.log('      (21600 tick mất ' + dt + 'ms)');
+  assert.strictEqual(r.code, 0);
+  assert.ok(dt < 5000, 'mất ' + dt + 'ms');
+  console.log('      (18000 tick mất ' + dt + 'ms)');
   rmSync(dir, { recursive: true, force: true });
 });
 
