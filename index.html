@@ -35,6 +35,7 @@
   #hud-center { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); }
 
   #mote-bar { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; }
+  #mote-label { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--mote-halo); opacity: 0.9; }
   .mote-cell { width: 18px; height: 18px; border-radius: 5px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,230,138,0.4); }
   .mote-cell.filled { background: var(--mote-core); box-shadow: 0 0 6px var(--mote-halo); }
 
@@ -81,6 +82,7 @@
     </div>
   </div>
   <div id="mote-bar"></div>
+  <div id="mote-label">0/10</div>
   <div id="cooldowns">
     <div class="cd" id="cd-dash"><div class="label">Lướt (Shift)</div><div class="bar"><div class="fill"></div></div></div>
     <div class="cd" id="cd-pulse"><div class="label">Tỏa Sáng (Q)</div><div class="bar"><div class="fill"></div></div></div>
@@ -148,6 +150,7 @@
     <div class="settings-row"><span>Âm lượng nhạc</span><input type="range" id="set-music" min="0" max="1" step="0.05"></div>
     <div class="settings-row"><span>Âm lượng hiệu ứng</span><input type="range" id="set-sfx" min="0" max="1" step="0.05"></div>
     <div class="settings-row"><span>Độ nhạy chuột</span><input type="range" id="set-sens" min="0.05" max="0.6" step="0.01"></div>
+    <div class="settings-row"><span>Bảng màu dễ phân biệt</span><input type="checkbox" id="set-cb"></div>
     <button class="btn primary" id="btn-settings-done">Xong</button>
   </div>
 </div>

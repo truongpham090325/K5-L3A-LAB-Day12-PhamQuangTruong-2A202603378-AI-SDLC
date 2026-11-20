@@ -29,7 +29,7 @@ export function loadSettings() {
   try {
     return JSON.parse(localStorage.getItem(VOLUME_KEY)) || { music: 0.5, sfx: 0.8, sensitivity: 0.22 };
   } catch {
-    return { music: 0.5, sfx: 0.8, sensitivity: 0.22 };
+    return { music: 0.5, sfx: 0.8, sensitivity: 0.22, colorBlind: false };
   }
 }
 

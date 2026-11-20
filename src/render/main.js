@@ -26,6 +26,7 @@ const clockEl = $('clock');
 const lanternCountEl = $('lantern-count');
 const scoreEl = $('score');
 const moteBarEl = $('mote-bar');
+const moteLabelEl = $('mote-label');
 const cdDashFill = $('cd-dash').querySelector('.fill');
 const cdPulseFill = $('cd-pulse').querySelector('.fill');
 const cdDashBox = $('cd-dash');
@@ -87,6 +88,7 @@ let paused = false;
 let yawDeg = 0;
 let locked = false;
 let flashT = 0;
+let colorBlind = false;
 const keys = {};
 
 const terrainGroup = new THREE.Group();
@@ -241,9 +243,14 @@ function buildLantern(l) {
   const light = new THREE.PointLight(0xffaa33, 0, 15, 1.8);
   light.position.y = 3.4;
   g.add(light);
+  // thanh dầu (hiện khi sáng)
+  const fuelBar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: C.gold }));
+  fuelBar.position.y = 4.2;
+  fuelBar.visible = false;
+  g.add(fuelBar);
   g.position.set(l.pos[0], l.pos[1], l.pos[2]);
   entityGroup.add(g);
-  lanternMeshes.set(l.id, { body, light });
+  lanternMeshes.set(l.id, { body, light, fuelBar });
 }
 
 function addMoteMesh(m) {
@@ -382,6 +389,7 @@ function togglePause() {
 }
 
 let settings = audio.loadSettings();
+colorBlind = !!settings.colorBlind;
 audio.setMusicVolume(settings.music);
 audio.setSfxVolume(settings.sfx);
 
@@ -393,15 +401,17 @@ $('btn-start').onclick = () => {
 $('btn-settings').onclick = () => show('settings');
 $('btn-settings2').onclick = () => show('settings');
 $('btn-settings-done').onclick = () => {
-  settings = { music: +$('set-music').value, sfx: +$('set-sfx').value, sensitivity: +$('set-sens').value };
+  settings = { music: +$('set-music').value, sfx: +$('set-sfx').value, sensitivity: +$('set-sens').value, colorBlind: !!$('set-cb').checked };
   audio.saveSettings(settings);
   audio.setMusicVolume(settings.music);
   audio.setSfxVolume(settings.sfx);
+  colorBlind = settings.colorBlind;
   show(paused ? 'pause-menu' : 'menu');
 };
 $('set-music').value = settings.music;
 $('set-sfx').value = settings.sfx;
 $('set-sens').value = settings.sensitivity;
+$('set-cb').checked = !!settings.colorBlind;
 
 function startNight(n) {
   currentNight = n;
@@ -452,8 +462,8 @@ $('btn-next').onclick = () => {
 function showResult() {
   phase = 'result';
   if (game.state === 'won') {
-    $('result-title').textContent = '🎉 Thắng!';
-    $('result-sub').textContent = 'Điểm đêm này: ' + game.score;
+    $('result-title').textContent = '🌅 Mây đã giữ đảo sáng đến bình minh!';
+    $('result-sub').textContent = 'Thắng! Điểm đêm này: ' + game.score;
   } else {
     $('result-title').textContent = '💫 Thua cuộc';
     $('result-sub').textContent = 'Điểm: ' + game.score;
@@ -489,14 +499,16 @@ function updateHUD() {
     }
   }
 
-  // thanh đom đóm
-  const cells = Math.min(p.carried, TUNING.carry_capacity);
+  // thanh đom đóm + sức chứa
+  const cap = p.capacity;
+  const cells = Math.min(p.carried, cap);
   moteBarEl.innerHTML = '';
-  for (let i = 0; i < TUNING.carry_capacity; i++) {
+  for (let i = 0; i < cap; i++) {
     const d = document.createElement('div');
     d.className = 'mote-cell' + (i < cells ? ' filled' : '');
     moteBarEl.appendChild(d);
   }
+  moteLabelEl.textContent = p.carried + '/' + cap;
 
   // hồi chiêu
   const dashCd = TUNING.dash_cooldown_s * 60;
@@ -506,11 +518,12 @@ function updateHUD() {
   cdDashBox.classList.toggle('ready', p.dashCdTicks <= 0);
   cdPulseBox.classList.toggle('ready', p.pulseCdTicks <= 0 && p.carried >= TUNING.pulse_cost);
 
-  // gợi ý nạp đèn
+  // gợi ý nạp đèn / châm dầu
   let nearest = null;
   let bestD = Infinity;
   for (const l of game.lanterns) {
-    if (l.lit) continue;
+    const full = l.lit && l.fuel >= 6000;
+    if (full) continue; // đèn đầy dầu
     const d = Math.hypot(l.pos[0] - p.pos[0], l.pos[2] - p.pos[2]);
     if (d < bestD) {
       bestD = d;
@@ -518,7 +531,8 @@ function updateHUD() {
     }
   }
   if (nearest && bestD <= TUNING.interact_radius) {
-    interactHintEl.textContent = 'E — Nạp ánh sáng (' + nearest.deposited + '/' + TUNING.lantern_cost + ')';
+    const hint = nearest.lit ? 'E — Châm dầu (' + nearest.fuel.toFixed(1) + '/100)' : 'E — Nạp ánh sáng (' + nearest.deposited + '/' + TUNING.lantern_cost + ')';
+    interactHintEl.textContent = hint;
     interactHintEl.classList.remove('hidden');
   } else {
     interactHintEl.classList.add('hidden');
@@ -588,16 +602,24 @@ function syncScene(dt) {
   playerGroup.position.set(p.pos[0], p.pos[1], p.pos[2]);
   playerGroup.rotation.y = (yawDeg * Math.PI) / 180;
 
+  const nowT = performance.now() / 1000;
+  const blink = (Math.floor(nowT * 2) % 2) === 0;
   for (const l of game.lanterns) {
     const m = lanternMeshes.get(l.id);
+    const f = Math.max(0, Math.min(1, l.fuel / 6000)); // 6000 = fuel_max(100) * 60
     if (l.lit) {
       m.body.material.emissive.set(C.lantern);
       m.body.material.color.set(C.lantern);
       m.light.intensity = 20;
+      m.fuelBar.visible = true;
+      m.fuelBar.scale.set(f * 0.7, 0.12, 0.12);
+      m.fuelBar.material.opacity = l.fuel < P.low_fuel_threshold * 60 ? (blink ? 1 : 0.45) : 1;
     } else {
       m.body.material.emissive.set(0x000000);
       m.body.material.color.set(C.unlit);
       m.light.intensity = 0;
+      m.fuelBar.visible = false;
+      m.body.scale.set(1, colorBlind ? 0.8 : 0.85, 1); // đèn tắt: bị xẹp
     }
   }
 
@@ -626,7 +648,16 @@ function syncScene(dt) {
     if (!shadeMeshes.has(s.id)) addShadeMesh(s);
     const g = shadeMeshes.get(s.id);
     g.position.set(s.pos[0], s.pos[1], s.pos[2]);
-    g.userData.body.material.emissive.set(s.state === 'stunned' ? C.shadeStun : 0x1a0a2a);
+    if (s.state === 'drain') {
+      g.userData.body.material.emissive.set(0x3a1a5a);
+      g.userData.body.material.color.set(0x5a2a90);
+    } else if (s.state === 'stunned') {
+      g.userData.body.material.emissive.set(C.shadeStun);
+      g.userData.body.material.color.set(C.shade);
+    } else {
+      g.userData.body.material.emissive.set(0x1a0a2a);
+      g.userData.body.material.color.set(colorBlind ? C.shadeEdge : C.shade);
+    }
     g.scale.y = s.state === 'stunned' ? 0.6 : 1;
   }
 
