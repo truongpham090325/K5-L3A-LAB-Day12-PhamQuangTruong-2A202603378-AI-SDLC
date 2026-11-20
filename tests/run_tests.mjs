@@ -53,7 +53,9 @@ console.log('\n== Test đơn vị (logic v1.2) ==');
 
 test('contract.json khớp constants.js (v1.2)', () => {
   const contract = JSON.parse(readFileSync(join(__dirname, '..', 'game.contract.json'), 'utf8'));
-  assert.strictEqual(contract.contract_version, '1.2');
+  assert.strictEqual(contract.contract_version, '1.3');
+  assert.strictEqual(contract.soak_cmd, 'node src/soak.js');
+  assert.strictEqual(contract.bench_cmd, 'node src/bench.js');
   assert.deepStrictEqual(contract.tuning, TUNING);
   assert.strictEqual(contract.tuning.fuel_max, 100);
   assert.strictEqual(contract.tuning.relight_cost, 5);
