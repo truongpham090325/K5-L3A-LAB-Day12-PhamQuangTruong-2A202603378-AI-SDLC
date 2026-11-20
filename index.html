@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đảo Đèn Lồng — Đêm 1: Đảo Bến</title>
+<style>
+  :root { --warm: #ffb84d; --ink: #3a2146; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #0a0a18; color: #eee; font-family: system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  #hud {
+    position: fixed; top: 12px; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 0 16px; pointer-events: none; z-index: 10;
+  }
+  #hud .panel {
+    display: flex; gap: 10px; align-items: center;
+    background: rgba(10, 10, 24, 0.55); border: 1px solid rgba(255,184,77,0.35);
+    border-radius: 10px; padding: 8px 14px; backdrop-filter: blur(4px);
+    font-size: 16px; white-space: nowrap;
+  }
+  #hud .panel b { color: var(--warm); }
+  #hud-center { flex: 1; display: flex; justify-content: center; }
+  #lanterns { font-size: 18px; }
+
+  #hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: rgba(10,10,24,0.6); border-radius: 999px; padding: 8px 18px;
+    font-size: 13px; color: #cdc7e0; pointer-events: none; z-index: 10;
+    text-align: center; white-space: nowrap;
+  }
+
+  #flash {
+    position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: radial-gradient(circle, rgba(255,60,60,0.0) 0%, rgba(255,60,60,0.55) 100%);
+    opacity: 0; transition: opacity 0.15s;
+  }
+
+  #overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(5,5,15,0.72); z-index: 20; backdrop-filter: blur(3px);
+  }
+  #overlay.hidden { display: none; }
+  #overlay-box {
+    text-align: center; background: rgba(20,20,40,0.9);
+    border: 1px solid rgba(255,184,77,0.4); border-radius: 18px; padding: 34px 48px;
+    max-width: 90vw;
+  }
+  #overlay-title { font-size: 40px; margin-bottom: 8px; }
+  #overlay-sub { font-size: 17px; color: #cdc7e0; margin-bottom: 20px; }
+  #restart {
+    font-size: 16px; padding: 10px 26px; border-radius: 999px; border: none;
+    background: var(--warm); color: #2a1800; cursor: pointer; font-weight: 700;
+  }
+  #restart:hover { filter: brightness(1.1); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div class="panel" id="hud-left">
+    <span>🔥 <b id="flames">3</b></span>
+    <span>✦ <b id="carried">0</b></span>
+  </div>
+  <div id="hud-center">
+    <div class="panel"><span id="lanterns">🏮 0/5</span></div>
+  </div>
+  <div class="panel" id="hud-right">
+    <span>⏳ <b id="time">180s</b></span>
+    <span>Điểm <b id="score">0</b></span>
+  </div>
+</div>
+
+<div id="hint">Click để chơi · WASD/phím mũi tên di chuyển · Space nhảy · E nạp đèn · Q tỏa sáng · Chuột xoay</div>
+<div id="flash"></div>
+
+<div id="overlay" class="hidden">
+  <div id="overlay-box">
+    <h1 id="overlay-title"></h1>
+    <p id="overlay-sub"></p>
+    <button id="restart">Chơi lại</button>
+  </div>
+</div>
+
+<script type="module" src="./src/render/main.js"></script>
+</body>
+</html>
