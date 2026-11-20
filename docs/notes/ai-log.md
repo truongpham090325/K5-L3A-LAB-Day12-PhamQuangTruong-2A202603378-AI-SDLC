@@ -1,4 +1,17 @@
-# Nhật ký dùng AI — Phase 1
+# Nhật ký dùng AI — Phase 1–3
+
+## (Phase 3 — Ticket-03)
+
+1. Đọc kỹ Ticket-03, tách **số liệu chuẩn (Phase 3)** khỏi phần thay đổi thiết kế → ghi ADR 3 + breaking-changes.
+2. Viết lại engine (`sim.js`) v1.2: nhiên liệu đèn (`fuel` nội bộ 1/60), đèn tắt → `lantern_out`, thắp lạp (+40, `relight`), Bóng Mực hút dầu `drain` (+15 Tỏa Sáng), luật thắng `dawn_survived`, sức chứa `10 + 2×successful_lights`, điểm chuẩn Phase 3.
+3. Cập nhật `game.contract.json` v1.2 + `constants.js` khớp.
+4. Cập nhật bộ test (24 test), đặc biệt: nhiên liệu, hút dầu, thắp lạp, luật thắng/thua mới, hiệu năng.
+5. Cập nhật game 3D: thanh dầu đèn + nhấp <30, mũi tên châm dầu, mù màu (cài đặt), trạng thái drain (viền tím), HUD (carried/capacity), tin nhắn Thắng.
+6. Lấy ý nhỏ: đổi timeout âm thanh đầu giờ toàn bộ âm thana (đặt vào loop() chứ không phải setTimeout).
+
+---
+
+# Nhật ký dùng AI — Phase 1–2
 
 > Cách tôi dùng AI: AI (Claude Code/agent) đóng vai trò **người viết code theo kế hoạch đã duyệt**, còn tôi **đọc yêu cầu, chọn giả định, định cách kiểm chứng trước, review và chạy test thật**.
 

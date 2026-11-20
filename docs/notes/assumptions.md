@@ -1,4 +1,15 @@
-# Giả định & quyết định — Phase 2 (Ticket-02, Test Contract v1.1)
+# Giả định & quyết định — Phase 2–3
+
+## (Phase 3 — Ticket-03, Test Contract v1.2) — ghi tiếp nối từ Phase 2
+
+- **Nhiên liệu:** lưu nội bộ **1/60 đơn vị** (tối đa 6000), luôn chính xác 1/60 giây; làm tròn 1 chữ số thập phân khi xuất (fuel/60).
+- **Hết dầu:** đèn tắt, `ever_lit` giữ, `fuel: 0` trong snapshot.
+- **Bóng Mực hút dầu:** chỉ ở `drain` chọn đèn "yếu" — mất vùng an toàn nghĩa là fuel < 30. Chuỗi: drain → chase (Mây trong 6m) / stunned (trúng Tỏa Sáng) / wander (đèn tắt, châm dầu ≥ 30, cách > 2m).
+- **Châm dầu:** `used = min(carried, ceil((100 - fuel_actual)/10))` (per ticket), `fuel_per_mote = 10`, cộng `cap = min(20, 10 + 2·successful_lights)`.
+- **Điểm:** per_mote=5 (nạp), +100 (thắp lần đầu), +40 (thắp lại), +5/+15 (Bóng Mực trúng pulse, drain +15); Bình minh (thắng): +50/đèn sáng + 50/Ngọn Lửa; bỏ `per_second_left`.
+- **Lớp nhưng phải hiển thị:** đèn tắt (nhấp + đụn 20% + giấy rách ở mù màu), đèn sắp hết dầu (nhấp 1Hz).
+
+## (Phase 2 — Ticket-02, Test Contract v1.1) — giữ các dòng cũ dưới đây
 
 Ticket-02 chuẩn hóa gần hết số liệu (bắt buộc). Dưới đây là những chỗ **vẫn còn mơ hồ** tôi đã tự quyết, và những lưu ý triển khai quan trọng. Các số chuẩn (tốc độ, chi phí, bán kính, thời gian…) nằm trong `src/core/constants.js` và `game.contract.json`, khớp đúng ticket.
 

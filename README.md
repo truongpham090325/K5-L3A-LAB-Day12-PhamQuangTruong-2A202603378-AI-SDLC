@@ -2,7 +2,7 @@
 
 > **Video demo:** *(sẽ thêm ở Phase 4)*
 
-Game 3D góc nhìn thứ ba. Bạn điều khiển **Mây**, người giữ đèn nhỏ tuổi của hòn đảo giữa biển mây. Sương đen đã nuốt hết ánh sáng — Mây phải chạy khắp ba hòn đảo thu thập **đom đóm**, mang về nạp vào các **Đèn Lồng Lớn**, né **Bóng Mực** và **Gió Lạc**, cho tới khi bình minh.
+Game 3D góc nhìn thứ ba. Bạn điều khiển **Mây**, người giữ đèn nhỏ tuổi của hòn đảo giữa biển mây. Sương đen đã nuốt hết ánh sáng — Mây phải chạy khắp ba hòn đảo, thu thập **đom đóm** để nạp vào các **Đèn Lồng Lớn**, giữ đảo **sáng tới bình minh** và né **Bóng Mực** / **Gió Lạc**.
 
 - **Công nghệ:** JavaScript (ES modules) + **Three.js** (3D, chạy trình duyệt) + **Node.js** (headless). Chạy được trên macOS, Linux, Windows.
 - **Kiến trúc:** logic game tách riêng trong `src/core/sim.js`, dùng chung cho cả chế độ chơi 3D lẫn chế độ headless.
@@ -26,79 +26,80 @@ Nếu trình duyệt không tự mở, truy cập **http://localhost:8080**.
 | Chuột (click để khóa con trỏ) | Xoay camera |
 | `Space` | Nhảy |
 | `Shift` | Lướt (dash) |
-| `E` | Nạp đom đóm vào đèn gần nhất |
+| `E` | Nạp đom đóm vào đèn / châm dầu đèn đang sáng |
 | `Q` | Tỏa sáng (xua Bóng Mực, tốn 3 đom đóm) |
-| `Esc` / `P` | Tạm dừng (Tiếp tục / Chơi lại / Cài đặt / Về menu) |
+| `Esc` / `P` | Tạm dừng |
 
 ## Ba Đêm
 
 | Đêm | Đảo | Thời gian | Đèn | Điểm riêng |
 |---|---|---:|---:|---|
-| 1 | Đảo Bến (đảo tròn 40m) | 300s | 5 | Bóng Mực |
-| 2 | Đảo Cau (hai đảo nối cầu tre, bục nhảy) | 330s | 6 | Bóng Mực, Gió Lạc, Bùa Gió |
-| 3 | Đảo Chuông (3 tầng, dốc, tháp chuông, gió mạnh) | 360s | 7 | Bóng Mực, Gió Lạc, Bùa Gió |
+| 1 | Đảo Bến (đảo tròn 40m) | 240s | 5 | Bóng Mực |
+| 2 | Đảo Cau (hai đảo nối cầu tre, bục nhảy) | 270s | 6 | Bóng Mực, Gió Lạc, Bùa Gió |
+| 3 | Đảo Chuông (3 tầng, dốc, tháp chuông, gió mạnh) | 300s | 7 | Bóng Mực, Gió Lạc, Bùa Gió |
 
-## Cách tính điểm (chuẩn hóa)
+## Cách tính điểm (Phase 3)
 
 | Sự kiện | Điểm |
 |---|---:|
-| Nạp 1 đom đóm vào đèn | +10 |
-| Thắp 1 Đèn Lồng Lớn | +100 |
-| 1 Bóng Mực trúng Tỏa Sáng | +5 |
-| Thắng: mỗi giây còn lại | +2 |
-| Thắng: mỗi ngọn lửa còn lại | +50 |
+| Nạp 1 đom đóm vào đèn (thắp mới / thắp lại / châm dầu) | +5 |
+| Thắp lần đầu | +100 |
+| Thắp lại | +40 |
+| 1 Bóng Mực trúng Tỏa Sáng (drain: +15) | +5 / +15 |
+| Bình minh (thắng): mỗi đèn đang sáng | +50 + floor(fuel) |
+| Bình minh (thắng): mỗi Ngọn Lửa còn lại | +50 |
 
-Tổng điểm = tổng điểm các Đêm **đã thắng**.
+## Luật chơi Phase 3 (tóm tắt)
 
-## Luật chơi (tóm tắt)
-
-- Mỗi đèn cần **10 đom đóm** để thắp; nạp nhiều lần được, đèn nhớ tiến độ. Mang tối đa **10**.
-- **Đom đóm** rải rác, nhặt tự động khi đi qua (bán kính 1m); sinh thêm theo thời gian.
-- **Bóng Mực** đuổi theo khi lại gần (12m); chạm mất 1 Ngọn Lửa và rơi nửa số đom đóm đang mang.
-- **Gió Lạc** (Đêm 2–3) cướp đom đóm khi Mây mang ≥ 5; Tỏa Sáng đuổi chúng đi.
-- **Tỏa Sáng** tốn 3 đom đóm, làm choáng Bóng Mực 2s.
-- **Lướt** (dash) phóng nhanh 14 m/s trong 0.2s, hồi chiêu 1.5s.
-- **Bùa Gió** tăng tốc chạy (7.2 m/s) và Lướt không hồi chiêu trong 10s.
-- Ngọn Lửa = máu, bắt đầu 3, hồi đầy mỗi Đêm.
-- **Thắng** khi thắp đủ đèn; **thua** khi hết Ngọn Lửa hoặc hết giờ.
-- Đèn đã sáng tạo vùng an toàn (6m) mà Bóng Mực không vào được.
+- **Nhiên liệu đèn:** đèn có dầu (max 100, hao 1.0/s). Đèn đã thắp vẫn có thể châm dầu nạp thêm (hết giờ 10 đom đóm/lần).
+- **Đèn tắt:** dầu chạy về 0 → đèn tắt (nhớ `ever_lit`); môi trường giảm.
+- **Thắp lại:** đèn đã từng sáng chỉ cần 5 đom đóm (thay vì 10).
+- **Sức chứa:** tăng dần `10 + 2×successful_lights` (max 20).
+- **Bóng Mực hút dầu:** chỉ Bóng Mực ở `wander` chọn đèn yếu (fuel < 30); gần ≤ 2m → `drain` (hút 5/giây + Bóng gây sát thương khi Mây vào 6m). Đèn vẫn hao 1/s tự nhiên.
+- **Thắng (mới):** Mây còn sống ở bình minh **và** số đèn đang sáng ≥ ceil(0.6 × đèn): Đêm 1 cần 3/5, Đêm 2 4/6, Đêm 3 5/7. (Thắp đủ đèn không thắng sớm.)
+- **Thua:** Hết Ngọn Lửa (ngay lập tức, kể cả tick cuối) · hoặc hết giờ mà đèn sáng dưới ngưỡng.
 
 ---
 
-## Chế độ headless (Test Contract v1.1)
+## Chế độ mù màu
 
-Khai báo ở **`game.contract.json`** (v1.1). Hỗ trợ `--night 1|2|3`.
+Cài đặt → "Bảng màu dễ phân biệt" (được lưu):
+- Viền/mắt Bóng Mực → cyan (`#00B3FF`).
+- Đèn tắt (xẹp 20%, giấy rách); đèn sắp hết dầu nhấp nháy (1Hz); đèn đã thắp/sáng phân biệt theo bằng chứng (nhấp nháy, sáng, dầu).
+
+---
+
+## Chế độ headless (Test Contract v1.2)
+
+Khai báo ở **`game.contract.json`** (v1.2). Hỗ trợ `--night 1|2|3`.
 
 ```bash
 node src/headless.js --seed <int> --night <1|2|3> [--scenario file.json] [--inputs file.json] \
                      --ticks <int> --out file.jsonl [--snapshot-every <int, mặc định 10>]
 ```
 
-- Logic chạy **60 tick/giây** cố định, không cần cửa sổ/GPU. Đêm đầy đủ (21600 tick) chạy **< 0.2s**.
+- Logic chạy **60 tick/giây** cố định, không cần cửa sổ/GPU. Đêm đầy đủ (18000 tick) chạy **< 0.3s**.
 - Output **JSONL**: dòng `night_start`, `snapshot`, `event`, `end` (bắt buộc cuối).
 - **Tính tất định:** cùng `--seed`, scenario, inputs luôn cho output giống hệt nhau.
 - Lỗi định dạng scenario/inputs → mã thoát `2`.
 
-Chi tiết giả định: [`docs/notes/assumptions.md`](docs/notes/assumptions.md).
+Chi tiết: [`docs/notes/assumptions.md`](docs/notes/assumptions.md), [ADR 3](docs/adr/03-lantern-fuel-dawn-win.md).
 
 ---
 
 ## Kiểm chứng
 
-- **Chạy test:** `npm test` (24 test đơn vị + tích hợp: di chuyển, nhảy, lướt, nhặt, nạp, tỏa sáng, Bóng Mực, Gió Lạc, Bùa Gió, gió, bục nhảy, rơi, thắng/thua, pause, tính tất định, hiệu năng).
-- **Bằng chứng:** [`docs/proof/phase-2/README.md`](docs/proof/phase-2/README.md).
+- **Chạy test:** `npm test` (24 test đơn vị + tích hợp: fuel, drain, relight, mù màu, luật thắng/thua, tính tất định, hiệu năng).
+- **Bằng chứng:** [`docs/proof/phase-3/README.md`](docs/proof/phase-3/README.md).
 
 ---
 
 ## Sáng tạo của tôi
 
-Ngoài phần lõi bắt buộc, tôi thêm các chi tiết **chỉ ở lớp hiển thị** (không đổi đầu ra headless):
-
-1. Nhân vật Mây với nón lá, khăn đỏ và đèn lồng nhỏ phát sáng ấm.
-2. Không khí đêm cổ tích: sao trời, sương mù, biển mây, đảo sáng dần khi thắp đèn.
-3. Hiệu ứng: vòng sóng khi Tỏa Sáng, chớp đỏ khi bị đánh, đom đóm bồng bềnh, Bóng Mực phát viền tím.
-4. Trang trí đảo: cây, đá, cầu tre, tháp chuông.
-5. Âm thanh **thủ tục** (WebAudio, không asset ngoài): nhạc nền + hiệu ứng nhặt/thắp/tỏa sáng/bị đánh/nhảy/lướt/thắng/thua/đếm ngược.
+(Giữ các mục Phase 1–2; mục hiển thị thêm cho Phase 3)
+- Bùa Gió (charm) nhấp + ánh sáng đỏ, đất nổi (Ma) trên Đảo Cau/Chuông.
+- Thanh dầu đèn (nhảy theo bảng màu chuẩn) và viền tím tắt/cua — hiệu nghệ.
+- Ngoài thanh dầu & HUD, Mây có màn hình bình minh (Đêm 1). Âm thanh thủ tục đầy đủ vẫn nguyên; nhạc nền thay đổi theo đêm.
 
 ## Giấy phép & nguồn
 
