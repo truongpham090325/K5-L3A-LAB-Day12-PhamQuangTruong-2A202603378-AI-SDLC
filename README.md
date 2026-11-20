@@ -1,6 +1,6 @@
 # Đảo Đèn Lồng (3 Đêm)
 
-> **Video demo:** *(sẽ thêm ở Phase 4)*
+> **Video demo:** [docs/demo/demo.mp4](docs/demo/demo.mp4) — đoạn quay của game Đảo Đèn Lồng (4 Đêm, phát hành v1.0.0), < 5 phút, chơi thử + bằng chứng game chạy đúng.
 
 Game 3D góc nhìn thứ ba. Bạn điều khiển **Mây**, người giữ đèn nhỏ tuổi của hòn đảo giữa biển mây. Sương đen đã nuốt hết ánh sáng — Mây phải chạy khắp ba hòn đảo, thu thập **đom đóm** để nạp vào các **Đèn Lồng Lớn**, giữ đảo **sáng tới bình minh** và né **Bóng Mực** / **Gió Lạc**.
 

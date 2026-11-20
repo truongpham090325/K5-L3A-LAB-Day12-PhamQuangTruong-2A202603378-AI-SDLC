@@ -1021,3 +1021,13 @@ window.addEventListener('load', async () => {
   const params = new URLSearchParams(location.search);
   if (params.get('bench') === '1') runBench(Number(params.get('duration') || 30));
 });
+
+// Expose game cho công cụ chụp frame (demo video)
+window.__ddl = {
+  get game() { return game; },
+  get renderer() { return renderer; },
+  get scene() { return scene; },
+  get camera() { return camera; },
+  get menu() { return $('menu'); },
+  startGame, syncScene, updateHUD,
+};
